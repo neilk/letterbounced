@@ -98,8 +98,18 @@ struct WordBitmap {
 }
 
 pub struct Solver {
-    word_bitmaps: Vec<WordBitmap>,
-    words_by_first_letter: HashMap<char, Vec<usize>>,
+    // All playable words (no frequency filter)
+    word_bitmaps_all: Vec<WordBitmap>,
+    words_by_first_letter_all: HashMap<char, Vec<usize>>,
+
+    // Words with frequency > 16 (for 3-word solutions)
+    word_bitmaps_freq_mid: Vec<WordBitmap>,
+    words_by_first_letter_freq_mid: HashMap<char, Vec<usize>>,
+
+    // Words with frequency > 24 (for 4-word solutions)
+    word_bitmaps_freq_common: Vec<WordBitmap>,
+    words_by_first_letter_freq_common: HashMap<char, Vec<usize>>,
+
     all_letters_mask: u32,
     max_solutions: usize, // this is usize for convenience in comparisons to length(), but set from u16
 }
@@ -121,31 +131,53 @@ impl Solver {
 
         // Create word bitmaps for all words playable
         let board_dictionary = board.playable_dictionary(&dictionary);
-        let word_bitmaps: Vec<WordBitmap> = board_dictionary
-            .words
-            .iter()
-            .map(|word| {
-                let bitmap = word.word.chars().fold(0, |acc, ch| {
-                    acc | letter_to_bit.get(&ch).copied().unwrap_or(0)
-                });
-                WordBitmap {
-                    word: word.clone(),
-                    bitmap,
-                }
-            })
-            .collect();
 
-        // Index words by first letter
-        let mut words_by_first_letter: HashMap<char, Vec<usize>> = HashMap::new();
-        for (i, word_bitmap) in word_bitmaps.iter().enumerate() {
-            if let Some(first_char) = word_bitmap.word.word.chars().next() {
-                words_by_first_letter.entry(first_char).or_default().push(i);
+        // Helper to create word bitmaps with frequency filter
+        let create_word_bitmaps = |min_frequency: i8| -> Vec<WordBitmap> {
+            board_dictionary
+                .words
+                .iter()
+                .filter(|word| word.frequency > min_frequency)
+                .map(|word| {
+                    let bitmap = word.word.chars().fold(0, |acc, ch| {
+                        acc | letter_to_bit.get(&ch).copied().unwrap_or(0)
+                    });
+                    WordBitmap {
+                        word: word.clone(),
+                        bitmap,
+                    }
+                })
+                .collect()
+        };
+
+        // Helper to index words by first letter
+        let index_by_first_letter = |word_bitmaps: &Vec<WordBitmap>| -> HashMap<char, Vec<usize>> {
+            let mut index: HashMap<char, Vec<usize>> = HashMap::new();
+            for (i, word_bitmap) in word_bitmaps.iter().enumerate() {
+                if let Some(first_char) = word_bitmap.word.word.chars().next() {
+                    index.entry(first_char).or_default().push(i);
+                }
             }
-        }
+            index
+        };
+
+        // Create filtered word sets
+        let word_bitmaps_all = create_word_bitmaps(-128); // All words (min i8)
+        let words_by_first_letter_all = index_by_first_letter(&word_bitmaps_all);
+
+        let word_bitmaps_freq_mid = create_word_bitmaps(10);
+        let words_by_first_letter_freq_mid = index_by_first_letter(&word_bitmaps_freq_mid);
+
+        let word_bitmaps_freq_common = create_word_bitmaps(16);
+        let words_by_first_letter_freq_common = index_by_first_letter(&word_bitmaps_freq_common);
 
         Solver {
-            word_bitmaps,
-            words_by_first_letter,
+            word_bitmaps_all,
+            words_by_first_letter_all,
+            word_bitmaps_freq_mid,
+            words_by_first_letter_freq_mid,
+            word_bitmaps_freq_common,
+            words_by_first_letter_freq_common,
             all_letters_mask,
             max_solutions: max_solutions.into(),
         }
@@ -161,8 +193,8 @@ impl Solver {
             let mut combined_bitmap = 0u32;
             for &idx in &indices {
                 let word = &solution.words[idx];
-                // Find the bitmap for this word
-                if let Some(wb) = self.word_bitmaps.iter().find(|wb| wb.word == *word) {
+                // Find the bitmap for this word (use all words since we need to check all solutions)
+                if let Some(wb) = self.word_bitmaps_all.iter().find(|wb| wb.word == *word) {
                     combined_bitmap |= wb.bitmap;
                 }
             }
@@ -180,9 +212,24 @@ impl Solver {
         let mut solutions = Vec::new();
 
         // Try solutions of each exact length
-        for target_length in 1..=4 {
+        for target_length in 1..=8 {
             let mut current_path = Vec::new();
-            self.search_recursive(&mut current_path, 0, None, &mut solutions, target_length);
+            // Select word set based on target length
+            let (word_bitmaps, words_by_first_letter) = match target_length {
+                1..=2 => (&self.word_bitmaps_all, &self.words_by_first_letter_all),
+                3 => (&self.word_bitmaps_freq_mid, &self.words_by_first_letter_freq_mid),
+                4..8 => (&self.word_bitmaps_freq_common, &self.words_by_first_letter_freq_common),
+                _ => (&self.word_bitmaps_all, &self.words_by_first_letter_all),
+            };
+            self.search_recursive(
+                &mut current_path,
+                0,
+                None,
+                &mut solutions,
+                target_length,
+                word_bitmaps,
+                words_by_first_letter,
+            );
             if solutions.len() >= self.max_solutions {
                 break;
             }
@@ -204,6 +251,8 @@ impl Solver {
         last_char: Option<char>,
         solutions: &mut Vec<Solution>,
         target_length: usize,
+        word_bitmaps: &[WordBitmap],
+        words_by_first_letter: &HashMap<char, Vec<usize>>,
     ) {
         // Early termination if we have enough solutions
         if solutions.len() >= self.max_solutions {
@@ -227,17 +276,17 @@ impl Solver {
         // Determine which words we can try next
         let word_indices: Vec<usize> = if let Some(ch) = last_char {
             // Must start with the last character of the previous word
-            self.words_by_first_letter
+            words_by_first_letter
                 .get(&ch)
                 .map(|v| v.clone())
                 .unwrap_or_default()
         } else {
             // First word - can be any word
-            (0..self.word_bitmaps.len()).collect()
+            (0..word_bitmaps.len()).collect()
         };
 
         for word_idx in word_indices {
-            let word_bitmap = &self.word_bitmaps[word_idx];
+            let word_bitmap = &word_bitmaps[word_idx];
             let new_bitmap = covered_bitmap | word_bitmap.bitmap;
 
             // Only continue if this word adds new letters
@@ -251,6 +300,8 @@ impl Solver {
                     new_last_char,
                     solutions,
                     target_length,
+                    word_bitmaps,
+                    words_by_first_letter,
                 );
 
                 current_path.pop();
@@ -334,9 +385,10 @@ mod tests {
         ];
         let board = Board::from_sides(sides).unwrap();
 
+        // Create words with high frequency (> 24) so they're available for all solution lengths
         let word_strs = ["foxglove", "equity", "eye", "golf", "flog", "glove", "exile", "exit", "tie", "yog"];
-        let word_strings = word_strs.iter().map(|&s| s.to_string()).collect();
-        let dictionary = Dictionary::from_strings(word_strings);
+        let words: Vec<Word> = word_strs.iter().map(|&s| Word::new(s.to_string(), 30)).collect();
+        let dictionary = Dictionary::from_words(words);
 
         let foxglove = &dictionary.words[0];
         let equity = &dictionary.words[1];
@@ -405,22 +457,22 @@ mod tests {
         assert_eq!(solver.all_letters_mask, 0b11111111); // 8 bits for 8 letters
 
         // Test that word bitmaps are correctly calculated
-        if let Some(word_ac) = solver.word_bitmaps.iter().find(|wb| wb.word.word == "AC") {
+        if let Some(word_ac) = solver.word_bitmaps_all.iter().find(|wb| wb.word.word == "AC") {
             // A=bit0, C=bit2, so AC should be 0b00000101
             assert_eq!(word_ac.bitmap, 0b00000101);
         }
 
-        if let Some(word_ce) = solver.word_bitmaps.iter().find(|wb| wb.word.word == "CE") {
+        if let Some(word_ce) = solver.word_bitmaps_all.iter().find(|wb| wb.word.word == "CE") {
             // C=bit2, E=bit4, so CE should be 0b00010100
             assert_eq!(word_ce.bitmap, 0b00010100);
         }
 
-        if let Some(word_eg) = solver.word_bitmaps.iter().find(|wb| wb.word.word == "EG") {
+        if let Some(word_eg) = solver.word_bitmaps_all.iter().find(|wb| wb.word.word == "EG") {
             // E=bit4, G=bit6, so EG should be 0b01010000
             assert_eq!(word_eg.bitmap, 0b01010000);
         }
 
         // Test that basic bitmap operations work
-        assert!(solver.word_bitmaps.len() > 0);
+        assert!(solver.word_bitmaps_all.len() > 0);
     }
 }
