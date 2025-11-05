@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 
-const SIDES_DISPLAY: &[&str] = &["top", "right", "bottom", "left"];
+const SIDES_DISPLAY: &[&str] = &["top", "right", "left", "bottom"];
 
 #[derive(Debug, Clone)]
 pub struct Board {

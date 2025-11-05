@@ -6,7 +6,7 @@
 
   function triggerSequentialJump(): void {
     // Animate each field in sequence, clockwise
-    for (const [index, charIndex] of [0, 1, 2, 3, 4, 5, 11, 10, 9, 8, 7, 6].entries()) {
+    for (const [index, charIndex] of [0, 1, 2, 3, 4, 5, 8, 7, 6, 11, 10, 9].entries()) {
       setTimeout(() => {
         jumping[charIndex] = true;
       }, index * 50); // 100ms delay between each jump
@@ -144,15 +144,15 @@
   #char04 { grid-column: 5; grid-row: 3; }
   #char05 { grid-column: 5; grid-row: 4; }
 
-  /* Left side - char06, char07, char08 (top to bottom) */
-  #char06 { grid-column: 1; grid-row: 2; }
-  #char07 { grid-column: 1; grid-row: 3; }
-  #char08 { grid-column: 1; grid-row: 4; }
+  /* Bottom side - char06, char07, char08 (top to bottom) */
+  #char06 { grid-column: 2; grid-row: 5; }
+  #char07 { grid-column: 3; grid-row: 5; }
+  #char08 { grid-column: 4; grid-row: 5; }
 
-  /* Bottom side - char09, char10, char11 (left to right) */
-  #char09 { grid-column: 2; grid-row: 5; }
-  #char10 { grid-column: 3; grid-row: 5; }
-  #char11 { grid-column: 4; grid-row: 5; }
+  /* Left side - char09, char10, char11 (left to right) */
+  #char09 { grid-column: 1; grid-row: 2; }
+  #char10 { grid-column: 1; grid-row: 3; }
+  #char11 { grid-column: 1; grid-row: 4; }
 
   /* Jump animations - each side jumps away from center */
   @keyframes jump-up {
@@ -217,17 +217,17 @@
     animation: jump-right 0.4s ease-out;
   }
 
-  /* Bottom side (char09, char10, char11) - jump down */
-  #char09.jump,
-  #char10.jump,
-  #char11.jump {
-    animation: jump-down 0.4s ease-out;
-  }
-
-  /* Left side (char06, char07, char08) - jump left */
+  /* Bottom side (char06, char07, char08)   - jump down */
   #char06.jump,
   #char07.jump,
   #char08.jump {
+    animation: jump-down 0.4s ease-out;
+  }
+
+  /* Left side (char09, char10, char11) - jump left */
+  #char09.jump,
+  #char10.jump,
+  #char11.jump {
     animation: jump-left 0.4s ease-out;
   }
 </style>
