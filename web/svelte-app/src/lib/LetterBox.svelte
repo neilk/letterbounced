@@ -1,47 +1,55 @@
 <script lang="ts">
   import { puzzleFields } from '../stores/puzzle';
-  import { onMount, onDestroy } from 'svelte';
 
-  let jumping: boolean[] = Array(12).fill(false);
+  // Order: clockwise starting from top-left
+  const clockwiseFieldIndices = [0, 1, 2, 3, 4, 5, 8, 7, 6, 11, 10, 9];
 
-  function triggerSequentialJump(): void {
-    // Animate each field in sequence, clockwise
-    for (const [index, charIndex] of [0, 1, 2, 3, 4, 5, 8, 7, 6, 11, 10, 9].entries()) {
-      setTimeout(() => {
-        jumping[charIndex] = true;
-      }, index * 50); // 100ms delay between each jump
+  let jumping: boolean[] = $state(Array(12).fill(false));
+  let displayValues: string[] = $state(Array(12).fill(''));
+  let sequentialTimeouts: number[] = [];
+  let isUserTyping = false;
+
+  // Effect to watch puzzleFields and update display sequentially when not typing
+  $effect(() => {
+    const fields = $puzzleFields;
+
+    // If user is typing, update immediately
+    if (isUserTyping) {
+      displayValues = [...fields];
+      isUserTyping = false;
+      return;
     }
-  }
 
-  function handlePuzzleLoaded(): void {
-    triggerSequentialJump();
-  }
-
-  onMount(() => {
-    window.addEventListener('puzzleLoaded', handlePuzzleLoaded);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('puzzleLoaded', handlePuzzleLoaded);
+    // Otherwise, animate sequentially (for puzzle loads)
+    // Clear any pending timeouts
+    sequentialTimeouts.forEach(clearTimeout);
+    // Add new timeouts for animating the letter
+    sequentialTimeouts = clockwiseFieldIndices.map((fieldIndex, sequenceIndex) => window.setTimeout(() => {
+        displayValues[fieldIndex] = fields[fieldIndex] || '';
+        jumping[fieldIndex] = true;
+      }, sequenceIndex * 50));
   });
 
   function handleInput(index: number, event: Event): void {
     const target = event.target as HTMLInputElement;
     const value = target.value.toUpperCase();
 
+    // Mark that user is typing (to skip sequential animation)
+    isUserTyping = true;
+
     // Only allow single uppercase letter
     if (value.length > 0) {
       const letter = value[value.length - 1]!.replace(/[^A-Z]/g, '');
       target.value = letter;
 
-      // Update the store
+      // Update store (effect will handle display update immediately)
       puzzleFields.update(fields => {
         const newFields = [...fields];
         newFields[index] = letter;
         return newFields;
       });
 
-      // Trigger jump animation
+      // Trigger jump animation (includes color inversion)
       jumping[index] = true;
 
       // Auto-advance to next field
@@ -93,7 +101,7 @@
       id="char{String(index).padStart(2, '0')}"
       class="letter-field"
       class:jump={jumping[index]}
-      value={$puzzleFields[index]}
+      value={displayValues[index]}
       on:input={(e) => handleInput(index, e)}
       on:keydown={(e) => handleKeydown(index, e)}
       on:click={handleFocusOrClick}
@@ -203,31 +211,41 @@
     }
   }
 
-  /* Top side (char00, char01, char02) - jump up */
+  /* Top side (char00, char01, char02) - jump up with color inversion */
   #char00.jump,
   #char01.jump,
   #char02.jump {
-    animation: jump-up 0.4s ease-out;
+    animation: jump-up 0.4s ease-out, color-fade 0.4s ease-out;
   }
 
-  /* Right side (char03, char04, char05) - jump right */
+  /* Right side (char03, char04, char05) - jump right with color inversion */
   #char03.jump,
   #char04.jump,
   #char05.jump {
-    animation: jump-right 0.4s ease-out;
+    animation: jump-right 0.4s ease-out, color-fade 0.4s ease-out;
   }
 
-  /* Bottom side (char06, char07, char08)   - jump down */
+  /* Bottom side (char06, char07, char08) - jump down with color inversion */
   #char06.jump,
   #char07.jump,
   #char08.jump {
-    animation: jump-down 0.4s ease-out;
+    animation: jump-down 0.4s ease-out, color-fade 0.4s ease-out;
   }
 
-  /* Left side (char09, char10, char11) - jump left */
+  /* Left side (char09, char10, char11) - jump left with color inversion */
   #char09.jump,
   #char10.jump,
   #char11.jump {
-    animation: jump-left 0.4s ease-out;
+    animation: jump-left 0.4s ease-out, color-fade 0.4s ease-out;
+  }
+
+  /* Color inversion animation - instant invert, slow fade back */
+  @keyframes color-fade {
+    0% {
+      filter: invert(1);
+    }
+    100% {
+      filter: invert(0);
+    }
   }
 </style>
