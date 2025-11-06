@@ -2,4 +2,5 @@
 .claude
 data/google-ngrams-words-all.txt
 web/dictionary.txt
+web/dictionary.bin
 .playwright-mcp
