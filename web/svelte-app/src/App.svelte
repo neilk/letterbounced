@@ -22,11 +22,11 @@
     // Load saved puzzle from localStorage
     loadPuzzleFromStorage();
 
-    // Initialize solver worker with dictionary
+    // Initialize solver worker with binary dictionary
     try {
-      const response = await fetch('./dictionary.txt');
-      const dictionaryText = await response.text();
-      const dictionaryData = new TextEncoder().encode(dictionaryText);
+      const response = await fetch('./dictionary.bin');
+      const arrayBuffer = await response.arrayBuffer();
+      const dictionaryData = new Uint8Array(arrayBuffer);
       initializeSolverWorker(dictionaryData);
     } catch (error) {
       initError = error instanceof Error ? error.message : 'Unknown error';

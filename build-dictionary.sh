@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e 
+set -e
 
-cargo run --bin dictionary-builder -- --frequencies data/google-ngrams-words-all.txt > /tmp/dictionary.txt
-sort -k 2,2rn -k 1 /tmp/dictionary.txt > data/dictionary.txt
+# Build binary dictionary (now includes sorting internally)
+cargo run --bin dictionary-builder -- --frequencies data/google-ngrams-words-all.txt > data/dictionary.bin
+
+echo "✅ Binary dictionary built at data/dictionary.bin"
