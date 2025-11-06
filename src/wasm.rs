@@ -41,8 +41,12 @@ static CURRENT_SOLVE: OnceLock<Mutex<Option<SolveTask>>> = OnceLock::new();
 pub fn initialize_dictionary(dictionary_data: Vec<u8>) -> Result<(), String> {
     console_log!("Initializing global dictionary from {} bytes", dictionary_data.len());
 
+    let start = js_sys::Date::now();
     let dictionary = Dictionary::from_bytes(&dictionary_data)?;
+    let parse_ms = js_sys::Date::now() - start;
     console_log!("Parsed dictionary with {} words", dictionary.words.len());
+    console_log!("Parsing took {}", parse_ms);
+    
 
     // Initialize the current solve tracker
     let _ = CURRENT_SOLVE.set(Mutex::new(None));
