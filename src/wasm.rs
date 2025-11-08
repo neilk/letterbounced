@@ -41,18 +41,15 @@ static CURRENT_SOLVE: OnceLock<Mutex<Option<SolveTask>>> = OnceLock::new();
 pub fn initialize_dictionary(dictionary_data: Vec<u8>) -> Result<(), String> {
     console_log!("Initializing global dictionary from {} bytes", dictionary_data.len());
 
-    let start = js_sys::Date::now();
-    let dictionary = Dictionary::from_binary(&dictionary_data)?;
-    let deserialize_ms = js_sys::Date::now() - start;
-
-    console_log!("✅ Deserialized dictionary with {} words in {:.2}ms", dictionary.words.len(), deserialize_ms);
+    let dictionary = Dictionary::from_bytes(&dictionary_data)?;
+    console_log!("Parsed dictionary with {} words", dictionary.words.len());
 
     // Initialize the current solve tracker
     let _ = CURRENT_SOLVE.set(Mutex::new(None));
 
     match GLOBAL_DICTIONARY.set(Arc::new(dictionary)) {
         Ok(()) => {
-            console_log!("✅ Global dictionary initialized successfully (total: {:.2}ms)", deserialize_ms);
+            console_log!("Global dictionary initialized successfully");
             Ok(())
         }
         Err(_) => Err("Dictionary already initialized".to_string())

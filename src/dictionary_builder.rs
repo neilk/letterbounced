@@ -1,10 +1,8 @@
 use clap::Parser;
 use std::cmp::{min, Ordering};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Lines, Result, Write};
+use std::io::{BufRead, BufReader, Lines, Result};
 use std::path::Path;
-
-use letter_bounced::dictionary::{Dictionary, Word};
 
 /**
  * Build the standard word-list for boxchar, which will be a list of words which are playable, along with
@@ -94,9 +92,6 @@ fn main() -> std::io::Result<()> {
     let mut frequencies_line_current = frequencies_lines.next();
     let mut scrabble_line_current = scrabble_lines.next();
 
-    // Collect words into a vector
-    let mut words = Vec::new();
-
     // Iterate through both of these very large files at once
     while let (Some(frequencies_line), Some(scrabble_line)) =
         (&frequencies_line_current, &scrabble_line_current)
@@ -109,12 +104,12 @@ fn main() -> std::io::Result<()> {
         let frequency: u64 = frequencies_split.next().unwrap().parse().unwrap();
         // However, to save a few bytes later when we pack it, we're going to assume the maximum "frequency_score" is just 31.
         // There are only a few super-short words which are above 31 anyway.
-        let frequency_score = min(frequency.ilog2(), 31) as i8;
+        let frequency_score = min(frequency.ilog2(), 31);
 
         match frequencies_word.cmp(&scrabble_word) {
             Ordering::Equal => {
                 if is_playable_word(frequencies_word) {
-                    words.push(Word::new(frequencies_word.to_string(), frequency_score));
+                    println!("{} {}", frequencies_word, frequency_score);
                 }
                 frequencies_line_current = frequencies_lines.next();
                 scrabble_line_current = scrabble_lines.next();
@@ -127,25 +122,6 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
-
-    // Sort words by frequency (descending), then alphabetically
-    // This matches the original shell command: sort -k 2,2rn -k 1
-    words.sort_by(|a, b| {
-        match b.frequency.cmp(&a.frequency) {
-            Ordering::Equal => a.word.cmp(&b.word),
-            other => other,
-        }
-    });
-
-    // Create Dictionary from collected words
-    let dictionary = Dictionary::from_words(words);
-
-    // Serialize to binary format
-    let binary_data = dictionary.to_binary()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
-    // Write binary data to stdout
-    std::io::stdout().write_all(&binary_data)?;
 
     Ok(())
 }

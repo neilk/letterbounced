@@ -7,10 +7,10 @@ echo "🌐 Building WASM for web..."
 echo "📦 Building WASM package..."
 wasm-pack build --target web --out-dir web/svelte-app/src/pkg
 
-# Copy binary dictionary to svelte-app public directory
-echo "📋 Copying binary dictionary..."
+# Copy dictionary to svelte-app public directory
+echo "📋 Copying dictionary..."
 mkdir -p web/svelte-app/public
-cp data/dictionary.bin web/svelte-app/public/
+cp data/dictionary.txt web/svelte-app/public/
 
 echo "✅ Web build complete!"
 echo "🚀 WASM files are in 'web/svelte-app/src/pkg/'"
