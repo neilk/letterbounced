@@ -25,7 +25,7 @@
     // Load saved puzzle from localStorage
     loadPuzzleFromStorage();
 
-    // Initialize solver worker with dictionary
+    // Initialize solver worker with binary dictionary
     try {
       initializeSolverWorker(dictionaryUrl);
     } catch (error) {
