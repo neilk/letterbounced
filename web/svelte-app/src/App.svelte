@@ -18,13 +18,16 @@
 
   let initError: string | null = null;
 
+  // Calculate dictionary URL relative to the current page
+  const dictionaryUrl = new URL('dictionary.txt', window.location.href).href;
+
   onMount(async () => {
     // Load saved puzzle from localStorage
     loadPuzzleFromStorage();
 
     // Initialize solver worker with dictionary
     try {
-      initializeSolverWorker();
+      initializeSolverWorker(dictionaryUrl);
     } catch (error) {
       initError = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to initialize solver worker:', error);
