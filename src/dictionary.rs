@@ -240,7 +240,7 @@ mod tests {
         for (orig, deser) in original.words.iter().zip(deserialized.words.iter()) {
             assert_eq!(orig.word, deser.word);
             assert_eq!(orig.frequency, deser.frequency);
-            assert_eq!(orig.digraphs, deser.digraphs);
+            assert_eq!(orig.digraph_indices, deser.digraph_indices);
         }
 
         // Verify digraphs match

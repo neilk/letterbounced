@@ -13,7 +13,7 @@ struct Args {
     #[arg(long)]
     board: Option<String>,
 
-    #[arg(long, default_value = "data/dictionary.txt")]
+    #[arg(long, default_value = "data/dictionary.bin")]
     dictionary: String,
 
     #[arg(long, default_value_t = 500u16)]
@@ -112,11 +112,16 @@ fn main() -> std::io::Result<()> {
     debug!("{}", format_valid_digraphs(&board.digraphs));
 
     debug!("Loading dictionary from: {:?}", dictionary_path);
-    match Dictionary::from_path(dictionary_path) {
-        Ok(dictionary) => {
-            solve(board, dictionary, max_solutions);
+    match std::fs::read(dictionary_path) {
+        Ok(binary_data) => {
+            match Dictionary::from_binary(&binary_data) {
+                Ok(dictionary) => {
+                    solve(board, dictionary, max_solutions);
+                }
+                Err(e) => eprintln!("Error deserializing dictionary: {}", e),
+            }
         }
-        Err(e) => eprintln!("Error loading dictionary: {}", e),
+        Err(e) => eprintln!("Error reading dictionary file: {}", e),
     }
 
     Ok(())

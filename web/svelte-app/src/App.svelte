@@ -19,7 +19,7 @@
   let initError: string | null = null;
 
   // Calculate dictionary URL relative to the current page
-  const dictionaryUrl = new URL('dictionary.txt', window.location.href).href;
+  const dictionaryUrl = new URL('dictionary.bin', window.location.href).href;
 
   onMount(async () => {
     // Load saved puzzle from localStorage
