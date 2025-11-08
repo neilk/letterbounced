@@ -13,18 +13,18 @@ use std::sync::Arc;
 pub struct Word {
     pub word: String,
     pub frequency: i8,
-    pub digraphs: HashSet<String>,
+    pub digraphs: Vec<String>,
 }
 
 impl Word {
     /// Extract digraphs (consecutive letter pairs) from a word
-    fn extract_digraphs(word: &str) -> HashSet<String> {
+    fn extract_digraphs(word: &str) -> Vec<String> {
         let chars: Vec<char> = word.chars().collect();
-        let mut digraphs = HashSet::new();
+        let mut digraphs = Vec::new();
 
         for i in 0..chars.len() - 1 {
             let digraph = format!("{}{}", chars[i], chars[i + 1]);
-            digraphs.insert(digraph);
+            digraphs.push(digraph);
         }
 
         digraphs
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_extract_digraphs_simple() {
-        let expected_digraphs: HashSet<String> = ["PI", "IR", "RA", "AT", "TE"]
+        let expected_digraphs: Vec<String> = ["PI", "IR", "RA", "AT", "TE"]
             .iter()
             .map(|s| s.to_string())
             .collect();
