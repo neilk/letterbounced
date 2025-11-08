@@ -1,5 +1,7 @@
 import init, { initialize_dictionary, solve_game, cancel_current_solve } from '../pkg/letter_bounced.js';
 
+const DICTIONARY_URL = '/dictionary.txt';
+
 interface WorkerMessageData {
   type: 'INIT' | 'CANCEL' | 'SOLVE';
   payload?: {
@@ -32,9 +34,13 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
   if (type === 'INIT') {
     try {
       await init();
-      if (payload?.dictionaryData) {
-        await initialize_dictionary(payload.dictionaryData);
+      const response = await fetch(DICTIONARY_URL);
+      if (!response.ok) {
+        throw new Error(`Error fetching ${DICTIONARY_URL}: ${response.status} ${response.statusText}`)
       }
+      const dictionaryText = await response.text();
+      const dictionaryData = new TextEncoder().encode(dictionaryText);
+      initialize_dictionary(dictionaryData);
       wasmReadyResolve(); // Resolve the pending promise
       self.postMessage({ type: 'READY' } as OutgoingMessage);
     } catch (error) {

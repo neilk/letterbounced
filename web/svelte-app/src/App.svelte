@@ -24,10 +24,7 @@
 
     // Initialize solver worker with dictionary
     try {
-      const response = await fetch('./dictionary.txt');
-      const dictionaryText = await response.text();
-      const dictionaryData = new TextEncoder().encode(dictionaryText);
-      initializeSolverWorker(dictionaryData);
+      initializeSolverWorker();
     } catch (error) {
       initError = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to initialize solver worker:', error);
