@@ -1,11 +1,11 @@
 import init, { initialize_dictionary, solve_game, cancel_current_solve } from '../pkg/letter_bounced.js';
 
-const DICTIONARY_URL = './dictionary.txt';
+// Dictionary path relative to this worker file (src/workers/solver-worker.ts -> public/dictionary.txt)
+const DICTIONARY_RELATIVE_URL = '../../dictionary.txt';
 
 interface WorkerMessageData {
   type: 'INIT' | 'CANCEL' | 'SOLVE';
   payload?: {
-    dictionaryData?: Uint8Array;
     sides?: string[];
     maxSolutions?: number;
   };
@@ -34,9 +34,9 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
   if (type === 'INIT') {
     try {
       await init();
-      const response = await fetch(DICTIONARY_URL);
+      const response = await fetch(DICTIONARY_RELATIVE_URL);
       if (!response.ok) {
-        throw new Error(`Error fetching ${DICTIONARY_URL}: ${response.status} ${response.statusText}`)
+        throw new Error(`Error fetching ${DICTIONARY_RELATIVE_URL}: ${response.status} ${response.statusText}`)
       }
       const dictionaryText = await response.text();
       const dictionaryData = new TextEncoder().encode(dictionaryText);
