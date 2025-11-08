@@ -8,12 +8,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Solution {
-    pub words: Vec<Word>,
+    pub words: Vec<Arc<Word>>,
     pub score: usize,
 }
 
 impl Solution {
-    pub fn new(words: Vec<Word>) -> Self {
+    pub fn new(words: Vec<Arc<Word>>) -> Self {
         let min_frequency: usize = words.iter().fold(256usize, |acc, w| min(acc, w.frequency as usize));
         let score: usize = (min_frequency * 10) / words.len();
         Solution { words, score }
@@ -95,7 +95,7 @@ impl fmt::Display for Solution {
 }
 
 struct WordBitmap {
-    word: Word,
+    word: Arc<Word>,
     bitmap: u32,
 }
 
@@ -131,7 +131,7 @@ impl Solver {
                     acc | letter_to_bit.get(&ch).copied().unwrap_or(0)
                 });
                 WordBitmap {
-                    word: word.clone(),
+                    word: Arc::clone(word),  // Cheap Arc clone - just increments ref count
                     bitmap,
                 }
             })
@@ -217,7 +217,7 @@ impl Solver {
 
     fn search_recursive(
         &self,
-        current_path: &mut Vec<Word>,
+        current_path: &mut Vec<Arc<Word>>,
         covered_bitmap: u32,
         last_char: Option<char>,
         solutions: &mut Vec<Solution>,
@@ -269,7 +269,7 @@ impl Solver {
 
             // Only continue if this word adds new letters
             if new_bitmap != covered_bitmap {
-                current_path.push(word_bitmap.word.clone());
+                current_path.push(Arc::clone(&word_bitmap.word));  // Cheap Arc clone
                 let new_last_char = word_bitmap.word.word.chars().last();
 
                 if !self.search_recursive(
@@ -385,8 +385,8 @@ mod tests {
         let solver = Solver::new(board, &dictionary, 1000);
         let solutions = solver.solve();
 
-        fn has(solutions: &Vec<Solution>, ws: Vec<&Word>) -> bool {
-            let vec_word_clones: Vec<Word> = ws.iter().map(|&w| w.clone()).collect();
+        fn has(solutions: &Vec<Solution>, ws: Vec<&Arc<Word>>) -> bool {
+            let vec_word_clones: Vec<Arc<Word>> = ws.iter().map(|&w| Arc::clone(w)).collect();
             let solution = Solution::new(vec_word_clones);
             solutions.contains(&solution)
         }

@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
+use std::sync::Arc;
 
 const SIDES_DISPLAY: &[&str] = &["top", "right", "left", "bottom"];
 
@@ -117,13 +118,24 @@ impl Board {
             self.digraphs.intersection(&dictionary.digraphs).collect();
 
         // Then cut it down to words which are playable on this board
-        let playable_words = dictionary
+        // Since dictionary.words is Vec<Arc<Word>>, cloning just increments the Arc ref count
+        let playable_words: Vec<Arc<_>> = dictionary
             .words
             .iter()
             .filter(|word| word.digraphs.iter().all(|d| usable_digraphs.contains(d)))
             .cloned()
             .collect();
 
-        Dictionary::from_words(playable_words)
+        // Need to convert Arc<Word> back to Word for from_words
+        // This is a bit awkward - we'll need to adjust from_words or create a new constructor
+        let mut valid_digraphs = HashSet::new();
+        for word in &playable_words {
+            valid_digraphs.extend(word.digraphs.iter().cloned());
+        }
+
+        Dictionary {
+            words: playable_words,
+            digraphs: valid_digraphs,
+        }
     }
 }

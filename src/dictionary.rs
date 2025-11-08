@@ -2,6 +2,7 @@ use std::collections::{HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
+use std::sync::Arc;
 
 /**
  * Note that we depend on the wordlist already being filtered to words which are
@@ -42,7 +43,7 @@ impl Word {
 
 #[derive(Debug)]
 pub struct Dictionary {
-    pub words: Vec<Word>,
+    pub words: Vec<Arc<Word>>,
     pub digraphs: HashSet<String>,
 }
 
@@ -56,7 +57,7 @@ impl Dictionary {
         }
 
         Dictionary {
-            words,
+            words: words.into_iter().map(Arc::new).collect(),
             digraphs: valid_digraphs,
         }
     }
