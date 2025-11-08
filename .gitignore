@@ -1,6 +1,6 @@
 /target
 .claude
 data/google-ngrams-words-all.txt
-web/dictionary.txt
-web/dictionary.bin
+web/svelte-app/public/dictionary.txt
+web/svelte-app/public/dictionary.bin
 .playwright-mcp
