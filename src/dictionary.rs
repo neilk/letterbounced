@@ -1,4 +1,4 @@
-use std::collections::{HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 pub struct Word {
     pub word: String,
     pub frequency: i8,
-    pub digraphs: Vec<String>,
+    pub digraph_indices: Vec<u8>,
 }
 
 impl Word {
@@ -31,12 +31,27 @@ impl Word {
     }
 
     /// Create a new Word with the given word string and frequency
+    /// This version is used when we don't have a digraph index yet (e.g., during Dictionary construction)
     pub fn new(word: String, frequency: i8) -> Self {
-        let digraphs = Self::extract_digraphs(&word);
         Word {
             word,
             frequency,
-            digraphs,
+            digraph_indices: Vec::new(), // Will be filled by Dictionary
+        }
+    }
+
+    /// Create a Word with digraph indices already computed
+    pub fn with_digraph_indices(word: String, frequency: i8, digraph_to_index: &HashMap<String, u8>) -> Self {
+        let digraph_strings = Self::extract_digraphs(&word);
+        let digraph_indices: Vec<u8> = digraph_strings
+            .iter()
+            .filter_map(|d| digraph_to_index.get(d).copied())
+            .collect();
+
+        Word {
+            word,
+            frequency,
+            digraph_indices,
         }
     }
 }
@@ -45,20 +60,43 @@ impl Word {
 pub struct Dictionary {
     pub words: Vec<Arc<Word>>,
     pub digraphs: HashSet<String>,
+    pub digraph_strings: Vec<String>,  // Master list of all digraphs by index
+    pub digraph_to_index: HashMap<String, u8>,  // Map digraph string to index
 }
 
 impl Dictionary {
     const DEFAULT_FREQUENCY: i8 = 15;
     pub fn from_words(words: Vec<Word>) -> Self {
+        // First pass: collect all unique digraphs from all words
         let mut valid_digraphs = HashSet::new();
-
         for word in &words {
-            valid_digraphs.extend(word.digraphs.iter().cloned());
+            let digraph_strings = Word::extract_digraphs(&word.word);
+            valid_digraphs.extend(digraph_strings);
         }
 
+        // Build the master digraph index
+        let mut digraph_strings: Vec<String> = valid_digraphs.iter().cloned().collect();
+        digraph_strings.sort(); // Sort for deterministic ordering
+
+        let digraph_to_index: HashMap<String, u8> = digraph_strings
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.clone(), i as u8))
+            .collect();
+
+        // Second pass: rebuild words with digraph indices
+        let words_with_indices: Vec<Arc<Word>> = words
+            .into_iter()
+            .map(|w| {
+                Arc::new(Word::with_digraph_indices(w.word, w.frequency, &digraph_to_index))
+            })
+            .collect();
+
         Dictionary {
-            words: words.into_iter().map(Arc::new).collect(),
+            words: words_with_indices,
             digraphs: valid_digraphs,
+            digraph_strings,
+            digraph_to_index,
         }
     }
 
@@ -124,13 +162,23 @@ mod tests {
 
     #[test]
     fn test_extract_digraphs_simple() {
-        let expected_digraphs: Vec<String> = ["PI", "IR", "RA", "AT", "TE"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let expected_digraphs: Vec<String> = vec!["AT".to_string(), "IR".to_string(), "PI".to_string(), "RA".to_string(), "TE".to_string()];
 
-        let word = Word::new("PIRATE".to_string(), 15);
-        assert_eq!(word.digraphs, expected_digraphs);
+        // Create a dictionary which will build the digraph index
+        let dictionary = Dictionary::from_strings(vec!["PIRATE".to_string()]);
+        let word = &dictionary.words[0];
+
+        // The word should have 5 digraph indices
+        assert_eq!(word.digraph_indices.len(), 5);
+
+        // Resolve the indices back to strings and verify they match
+        let mut resolved_digraphs: Vec<String> = word.digraph_indices
+            .iter()
+            .map(|&idx| dictionary.digraph_strings[idx as usize].clone())
+            .collect();
+        resolved_digraphs.sort();
+
+        assert_eq!(resolved_digraphs, expected_digraphs);
     }
 
     #[test]

@@ -113,29 +113,42 @@ impl Board {
     }
 
     pub fn playable_dictionary(&self, dictionary: &Dictionary) -> Dictionary {
-        // Eliminate any digraphs on this board which are totally impossible in the whole dictionary, e.g. 'vz', 'zq'
-        let usable_digraphs: HashSet<&String> =
-            self.digraphs.intersection(&dictionary.digraphs).collect();
+        // Build a set of usable digraph indices by checking which dictionary digraphs are playable on this board
+        let usable_digraph_indices: HashSet<u8> = dictionary.digraph_strings
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, digraph_str)| {
+                if self.digraphs.contains(digraph_str) {
+                    Some(idx as u8)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-        // Then cut it down to words which are playable on this board
-        // Since dictionary.words is Vec<Arc<Word>>, cloning just increments the Arc ref count
+        // Filter words to only those whose digraph indices are all usable
         let playable_words: Vec<Arc<_>> = dictionary
             .words
             .iter()
-            .filter(|word| word.digraphs.iter().all(|d| usable_digraphs.contains(d)))
+            .filter(|word| {
+                word.digraph_indices.iter().all(|&idx| usable_digraph_indices.contains(&idx))
+            })
             .cloned()
             .collect();
 
-        // Need to convert Arc<Word> back to Word for from_words
-        // This is a bit awkward - we'll need to adjust from_words or create a new constructor
+        // Build the valid digraphs set from playable words
         let mut valid_digraphs = HashSet::new();
         for word in &playable_words {
-            valid_digraphs.extend(word.digraphs.iter().cloned());
+            for &idx in &word.digraph_indices {
+                valid_digraphs.insert(dictionary.digraph_strings[idx as usize].clone());
+            }
         }
 
         Dictionary {
             words: playable_words,
             digraphs: valid_digraphs,
+            digraph_strings: dictionary.digraph_strings.clone(),
+            digraph_to_index: dictionary.digraph_to_index.clone(),
         }
     }
 }
