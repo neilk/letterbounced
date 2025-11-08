@@ -102,11 +102,11 @@
       class="letter-field"
       class:jump={jumping[index]}
       value={displayValues[index]}
-      on:input={(e) => handleInput(index, e)}
-      on:keydown={(e) => handleKeydown(index, e)}
-      on:click={handleFocusOrClick}
-      on:focus={handleFocusOrClick}
-      on:animationend={() => handleAnimationEnd(index)}>
+      oninput={(e) => handleInput(index, e)}
+      onkeydown={(e) => handleKeydown(index, e)}
+      onclick={handleFocusOrClick}
+      onfocus={handleFocusOrClick}
+      onanimationend={() => handleAnimationEnd(index)}>
   {/each}
 </div>
 
