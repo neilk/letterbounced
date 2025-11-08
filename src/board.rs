@@ -152,3 +152,99 @@ impl Board {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dictionary::Dictionary;
+
+    fn strs_to_vec_strings(strs: &[&str]) -> Vec<String> {
+        strs.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn test_playable_dictionary_filters_words_with_invalid_letters() {
+        // No 'd' on the board
+        let board = Board::from_sides(strs_to_vec_strings(&["otx", "gmi", "fle", "aun"])).unwrap();
+
+        let impossible_words = &["demagogue"];
+        let possible_words = &["exfoliating", "monologue"];
+        let all_words = &[&impossible_words[..], &possible_words[..]].concat();
+
+        let dictionary = Dictionary::from_strings(
+            strs_to_vec_strings(all_words)
+        );
+        let playable = board.playable_dictionary(&dictionary);
+
+        for word in impossible_words.iter() {
+            assert!(!playable.words.iter().any(|w| &w.word == word),
+                    "Word '{}' should not be playable", word);
+        }
+
+        for word in possible_words.iter() {
+            assert!(playable.words.iter().any(|w| &w.word == word),
+                    "Word '{}' should be playable", word);
+        }
+    }
+
+    #[test]
+    fn test_playable_dictionary_filters_words_with_same_side_digraphs() {
+        let board = Board::from_sides(strs_to_vec_strings(&["otx", "gmi", "fle", "aun"])).unwrap();
+
+        let impossible_words = &["gin", "mingle"];
+        let possible_words = &["exfoliating", "monologue"];
+        let all_words = &[&impossible_words[..], &possible_words[..]].concat();
+
+        let dictionary = Dictionary::from_strings(
+            strs_to_vec_strings(all_words)
+        );
+        let playable = board.playable_dictionary(&dictionary);
+
+        for word in impossible_words.iter() {
+            assert!(!playable.words.iter().any(|w| w.word == *word),
+                    "Word '{}' should not be playable", word);
+        }
+
+        for word in possible_words.iter() {
+            assert!(playable.words.iter().any(|w| w.word == *word),
+                    "Word '{}' should be playable", word);
+        }
+    }
+
+    #[test]
+    fn test_validate_sides_content_rejects_non_ascii() {
+        let result = Board::from_sides(strs_to_vec_strings(&["otx", "gmi", "fl3", "aun"]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_normal_board() {
+        let result = Board::from_sides(strs_to_vec_strings(&["otx", "gmi", "fle", "aun"]));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_rejects_duplicate_on_different_sides() {
+        let result = Board::from_sides(strs_to_vec_strings(&["otx", "gmi", "fle", "tun"]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_sides_content_rejects_duplicate_on_same_side() {
+        let result = Board::from_sides(strs_to_vec_strings(&["ott", "gmi", "fle", "aun"]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_zero_length_side() {
+        let result = Board::from_sides(strs_to_vec_strings(&["otx", "gmi", "fle", ""]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_non_equal_length_sides() {
+        let result = Board::from_sides(strs_to_vec_strings(&["otx", "gmi", "fle", "aunz"]));
+        assert!(result.is_err());
+    }
+
+}
