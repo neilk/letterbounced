@@ -1,6 +1,6 @@
 import init, { initialize_dictionary, solve_game, cancel_current_solve } from '../pkg/letter_bounced.js';
 
-const DICTIONARY_URL = '/dictionary.txt';
+const DICTIONARY_URL = './dictionary.txt';
 
 interface WorkerMessageData {
   type: 'INIT' | 'CANCEL' | 'SOLVE';
