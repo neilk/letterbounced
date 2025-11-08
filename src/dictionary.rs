@@ -60,8 +60,8 @@ impl Word {
 pub struct Dictionary {
     pub words: Vec<Arc<Word>>,
     pub digraphs: HashSet<String>,
-    pub digraph_strings: Vec<String>,  // Master list of all digraphs by index
-    pub digraph_to_index: HashMap<String, u8>,  // Map digraph string to index
+    pub root_digraph_strings: Vec<String>,  // Master list of all digraphs by index (shared across filtered dictionaries)
+    pub root_digraph_to_index: HashMap<String, u8>,  // Map digraph string to index (shared across filtered dictionaries)
 }
 
 impl Dictionary {
@@ -95,8 +95,8 @@ impl Dictionary {
         Dictionary {
             words: words_with_indices,
             digraphs: valid_digraphs,
-            digraph_strings,
-            digraph_to_index,
+            root_digraph_strings: digraph_strings,
+            root_digraph_to_index: digraph_to_index,
         }
     }
 
@@ -174,7 +174,7 @@ mod tests {
         // Resolve the indices back to strings and verify they match
         let mut resolved_digraphs: Vec<String> = word.digraph_indices
             .iter()
-            .map(|&idx| dictionary.digraph_strings[idx as usize].clone())
+            .map(|&idx| dictionary.root_digraph_strings[idx as usize].clone())
             .collect();
         resolved_digraphs.sort();
 
