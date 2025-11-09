@@ -23,7 +23,7 @@ export const solverError: Writable<string | null> = writable(null);
 let currentSolveId = 0;
 let worker: Worker | null = null;
 
-export function initializeSolverWorker(dictionaryData: Uint8Array): void {
+export function initializeSolverWorker(dictionaryUrl: string): void {
   worker = new Worker(
     new URL('../workers/solver-worker.ts', import.meta.url),
     { type: 'module' }
@@ -67,7 +67,7 @@ export function initializeSolverWorker(dictionaryData: Uint8Array): void {
 
   worker.postMessage({
     type: 'INIT',
-    payload: { dictionaryData }
+    payload: { dictionaryUrl }
   });
 }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { solutions, solving } from '../stores/solver-worker';
+  import { solutions, solving, solverReady } from '../stores/solver-worker';
   import { isPuzzleComplete } from '../stores/puzzle';
 
   interface ParsedSolution {
@@ -107,7 +107,7 @@
 
 <div class="solutions-container">
   {#if $isPuzzleComplete}
-    {#if $solving}
+    {#if !($solverReady) || $solving}
       <!-- Show loading state while solving -->
       <div class="loading-state">
         <div class="loading-spinner"></div>

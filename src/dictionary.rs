@@ -1,7 +1,11 @@
-use std::collections::{HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
+use std::sync::Arc;
+
+// Maximum possible digraphs: 26 letters × 26 letters = 676
+const MAX_POSSIBLE_DIGRAPHS: usize = 26 * 26;
 
 /**
  * Note that we depend on the wordlist already being filtered to words which are
@@ -12,52 +16,102 @@ use std::path::Path;
 pub struct Word {
     pub word: String,
     pub frequency: i8,
-    pub digraphs: HashSet<String>,
+    pub digraph_indices: Vec<u16>,
 }
 
 impl Word {
     /// Extract digraphs (consecutive letter pairs) from a word
-    fn extract_digraphs(word: &str) -> HashSet<String> {
+    fn extract_digraphs(word: &str) -> Vec<String> {
         let chars: Vec<char> = word.chars().collect();
-        let mut digraphs = HashSet::new();
+        let mut digraphs = Vec::new();
 
         for i in 0..chars.len() - 1 {
             let digraph = format!("{}{}", chars[i], chars[i + 1]);
-            digraphs.insert(digraph);
+            digraphs.push(digraph);
         }
 
         digraphs
     }
 
     /// Create a new Word with the given word string and frequency
+    /// This version is used when we don't have a digraph index yet (e.g., during Dictionary construction)
     pub fn new(word: String, frequency: i8) -> Self {
-        let digraphs = Self::extract_digraphs(&word);
         Word {
             word,
             frequency,
-            digraphs,
+            digraph_indices: Vec::new(), // Will be filled by Dictionary
+        }
+    }
+
+    /// Create a Word with digraph indices already computed
+    pub fn with_digraph_indices(word: String, frequency: i8, digraph_to_index: &HashMap<String, u16>) -> Self {
+        let digraph_strings = Self::extract_digraphs(&word);
+        let digraph_indices: Vec<u16> = digraph_strings
+            .iter()
+            .filter_map(|d| digraph_to_index.get(d).copied())
+            .collect();
+
+        Word {
+            word,
+            frequency,
+            digraph_indices,
         }
     }
 }
 
 #[derive(Debug)]
 pub struct Dictionary {
-    pub words: Vec<Word>,
+    pub words: Vec<Arc<Word>>,
     pub digraphs: HashSet<String>,
+    pub root_digraph_strings: Vec<String>,  // Master list of all digraphs by index (shared across filtered dictionaries)
+    pub root_digraph_to_index: HashMap<String, u16>,  // Map digraph string to index (shared across filtered dictionaries)
 }
 
 impl Dictionary {
     const DEFAULT_FREQUENCY: i8 = 15;
     pub fn from_words(words: Vec<Word>) -> Self {
+        // First pass: collect all unique digraphs from all words
         let mut valid_digraphs = HashSet::new();
-
         for word in &words {
-            valid_digraphs.extend(word.digraphs.iter().cloned());
+            let digraph_strings = Word::extract_digraphs(&word.word);
+            valid_digraphs.extend(digraph_strings);
         }
 
+        // Build the master digraph index
+        let mut digraph_strings: Vec<String> = valid_digraphs.iter().cloned().collect();
+        digraph_strings.sort(); // Sort for deterministic ordering
+
+        if digraph_strings.len() > MAX_POSSIBLE_DIGRAPHS {
+            panic!(
+                "Dictionary contains {} digraphs, but maximum possible is {} (26×26). This indicates corrupted data.",
+                digraph_strings.len(),
+                MAX_POSSIBLE_DIGRAPHS
+            );
+        }
+
+        let digraph_to_index: HashMap<String, u16> = digraph_strings
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                // Safe: checked above that count ≤ 676, well within u16
+                #[allow(clippy::cast_possible_truncation)]
+                (s.clone(), i as u16)
+            })
+            .collect();
+
+        // Second pass: rebuild words with digraph indices
+        let words_with_indices: Vec<Arc<Word>> = words
+            .into_iter()
+            .map(|w| {
+                Arc::new(Word::with_digraph_indices(w.word, w.frequency, &digraph_to_index))
+            })
+            .collect();
+
         Dictionary {
-            words,
+            words: words_with_indices,
             digraphs: valid_digraphs,
+            root_digraph_strings: digraph_strings,
+            root_digraph_to_index: digraph_to_index,
         }
     }
 
@@ -71,7 +125,7 @@ impl Dictionary {
     }
 
     fn parse_word_line(line: &str) -> Option<Word> {
-        let mut parts = line.trim().split_whitespace();
+        let mut parts = line.split_whitespace();
         match (parts.next(), parts.next()) {
             (Some(word_str), Some(frequency_str)) => match frequency_str.parse::<i8>() {
                 Ok(frequency) => Some(Word::new(word_str.to_string(), frequency)),
@@ -123,13 +177,23 @@ mod tests {
 
     #[test]
     fn test_extract_digraphs_simple() {
-        let expected_digraphs: HashSet<String> = ["PI", "IR", "RA", "AT", "TE"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let expected_digraphs: Vec<String> = vec!["AT".to_string(), "IR".to_string(), "PI".to_string(), "RA".to_string(), "TE".to_string()];
 
-        let word = Word::new("PIRATE".to_string(), 15);
-        assert_eq!(word.digraphs, expected_digraphs);
+        // Create a dictionary which will build the digraph index
+        let dictionary = Dictionary::from_strings(vec!["PIRATE".to_string()]);
+        let word = &dictionary.words[0];
+
+        // The word should have 5 digraph indices
+        assert_eq!(word.digraph_indices.len(), 5);
+
+        // Resolve the indices back to strings and verify they match
+        let mut resolved_digraphs: Vec<String> = word.digraph_indices
+            .iter()
+            .map(|&idx| dictionary.root_digraph_strings[idx as usize].clone())
+            .collect();
+        resolved_digraphs.sort();
+
+        assert_eq!(resolved_digraphs, expected_digraphs);
     }
 
     #[test]

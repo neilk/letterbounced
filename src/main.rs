@@ -38,6 +38,18 @@ fn validate_board_spec(board_spec: &str) -> Result<Vec<String>, String> {
     Ok(sides)
 }
 
+
+
+pub fn format_valid_digraphs(digraphs: &HashSet<String>) -> String {
+    let mut sorted_digraphs: Vec<_> = digraphs.iter().collect();
+    sorted_digraphs.sort();
+    sorted_digraphs
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn main() -> std::io::Result<()> {
     env_logger::init();
     let args = Args::parse();
@@ -90,16 +102,6 @@ fn main() -> std::io::Result<()> {
     };
 
 
-    pub fn format_valid_digraphs(digraphs: &HashSet<String>) -> String {
-        let mut sorted_digraphs: Vec<_> = digraphs.iter().collect();
-        sorted_digraphs.sort();
-        sorted_digraphs
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
     debug!("Successfully loaded game:");
     for (i, side) in board.sides.iter().enumerate() {
         debug!("Side {}: {} ({} letters)", i, side, side.len());
@@ -132,6 +134,15 @@ fn solve(board: Board, dictionary: Dictionary, max_solutions: u16) {
             debug!("  {}", w.word);
         }
         debug!("Total possible words: {}", board_dictionary.words.len());
+        debug!(
+            "Total possible digraphs in dictionary: {}",
+            board_dictionary.digraphs.len()
+        );
+        debug!(
+            "Possible digraphs in dictionary:\n{}",
+            format_valid_digraphs(&board_dictionary.digraphs)
+        );
+
 
         // Run the solver
         debug!("\nSolving the puzzle...");
