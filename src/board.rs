@@ -140,7 +140,7 @@ impl Board {
             .enumerate()
             .filter_map(|(idx, digraph_str)| {
                 if self.digraphs.contains(digraph_str) {
-                    Some(idx as u16)
+                    u16::try_from(idx).ok()
                 } else {
                     None
                 }

@@ -14,7 +14,11 @@ pub struct Solution {
 
 impl Solution {
     pub fn new(words: Vec<Arc<Word>>) -> Self {
-        let min_frequency: usize = words.iter().fold(256usize, |acc, w| min(acc, w.frequency as usize));
+        let min_frequency: usize = words.iter().fold(256usize, |acc, w| {
+            // frequency is i8, but represents 0-31 range
+            let freq = usize::try_from(w.frequency).unwrap_or(0);
+            min(acc, freq)
+        });
         let score: usize = (min_frequency * 10) / words.len();
         Solution { words, score }
     }
@@ -122,7 +126,7 @@ impl Solver {
         let all_letters_mask = 2u32.pow(bit_index) - 1;
 
         // Create word bitmaps for all words playable
-        let board_dictionary = board.playable_dictionary(&dictionary);
+        let board_dictionary = board.playable_dictionary(dictionary);
         let word_bitmaps: Vec<WordBitmap> = board_dictionary
             .words
             .iter()
@@ -255,8 +259,7 @@ impl Solver {
         let word_indices: Vec<usize> = if let Some(ch) = last_char {
             // Must start with the last character of the previous word
             self.words_by_first_letter
-                .get(&ch)
-                .map(|v| v.clone())
+                .get(&ch).cloned()
                 .unwrap_or_default()
         } else {
             // First word - can be any word
@@ -454,6 +457,6 @@ mod tests {
         }
 
         // Test that basic bitmap operations work
-        assert!(solver.word_bitmaps.len() > 0);
+        assert!(!solver.word_bitmaps.is_empty());
     }
 }

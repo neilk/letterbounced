@@ -81,7 +81,9 @@ impl Dictionary {
         let digraph_to_index: HashMap<String, u16> = digraph_strings
             .iter()
             .enumerate()
-            .map(|(i, s)| (s.clone(), i as u16))
+            .map(|(i, s)| {
+                (s.clone(), u16::try_from(i).expect("Too many digraphs - exceeds u16::MAX"))
+            })
             .collect();
 
         // Second pass: rebuild words with digraph indices
@@ -110,7 +112,7 @@ impl Dictionary {
     }
 
     fn parse_word_line(line: &str) -> Option<Word> {
-        let mut parts = line.trim().split_whitespace();
+        let mut parts = line.split_whitespace();
         match (parts.next(), parts.next()) {
             (Some(word_str), Some(frequency_str)) => match frequency_str.parse::<i8>() {
                 Ok(frequency) => Some(Word::new(word_str.to_string(), frequency)),
