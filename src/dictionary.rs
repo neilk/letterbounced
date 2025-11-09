@@ -5,9 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 // Maximum possible digraphs: 26 letters × 26 letters = 676
-// This fits comfortably in u16 (max 65,535)
-// Const assertion to verify at compile time
-const _: () = assert!(26 * 26 <= u16::MAX as usize);
+const MAX_POSSIBLE_DIGRAPHS: usize = 26 * 26;
 
 /**
  * Note that we depend on the wordlist already being filtered to words which are
@@ -83,11 +81,19 @@ impl Dictionary {
         let mut digraph_strings: Vec<String> = valid_digraphs.iter().cloned().collect();
         digraph_strings.sort(); // Sort for deterministic ordering
 
+        if digraph_strings.len() > MAX_POSSIBLE_DIGRAPHS {
+            panic!(
+                "Dictionary contains {} digraphs, but maximum possible is {} (26×26). This indicates corrupted data.",
+                digraph_strings.len(),
+                MAX_POSSIBLE_DIGRAPHS
+            );
+        }
+
         let digraph_to_index: HashMap<String, u16> = digraph_strings
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                // Safe: maximum possible digraphs is 26×26=676, well within u16
+                // Safe: checked above that count ≤ 676, well within u16
                 #[allow(clippy::cast_possible_truncation)]
                 (s.clone(), i as u16)
             })
