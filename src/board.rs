@@ -140,7 +140,9 @@ impl Board {
             .enumerate()
             .filter_map(|(idx, digraph_str)| {
                 if self.digraphs.contains(digraph_str) {
-                    u16::try_from(idx).ok()
+                    // Safe: maximum possible digraphs is 26×26=676, well within u16
+                    #[allow(clippy::cast_possible_truncation)]
+                    Some(idx as u16)
                 } else {
                     None
                 }

@@ -4,6 +4,11 @@ use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
 
+// Maximum possible digraphs: 26 letters × 26 letters = 676
+// This fits comfortably in u16 (max 65,535)
+// Const assertion to verify at compile time
+const _: () = assert!(26 * 26 <= u16::MAX as usize);
+
 /**
  * Note that we depend on the wordlist already being filtered to words which are
  * playable in our game.
@@ -82,7 +87,9 @@ impl Dictionary {
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                (s.clone(), u16::try_from(i).expect("Too many digraphs - exceeds u16::MAX"))
+                // Safe: maximum possible digraphs is 26×26=676, well within u16
+                #[allow(clippy::cast_possible_truncation)]
+                (s.clone(), i as u16)
             })
             .collect();
 
