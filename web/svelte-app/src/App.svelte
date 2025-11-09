@@ -19,13 +19,13 @@
   let initError: string | null = null;
 
   // Calculate dictionary URL relative to the current page
-  const dictionaryUrl = new URL('dictionary.txt', window.location.href).href;
+  const dictionaryUrl = new URL('dictionary.bin', window.location.href).href;
 
   onMount(async () => {
     // Load saved puzzle from localStorage
     loadPuzzleFromStorage();
 
-    // Initialize solver worker with dictionary
+    // Initialize solver worker with binary dictionary
     try {
       initializeSolverWorker(dictionaryUrl);
     } catch (error) {

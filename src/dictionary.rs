@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
+use serde::{Serialize, Deserialize};
 
 // Maximum possible digraphs: 26 letters × 26 letters = 676
 const MAX_POSSIBLE_DIGRAPHS: usize = 26 * 26;
@@ -12,7 +13,7 @@ const MAX_POSSIBLE_DIGRAPHS: usize = 26 * 26;
  * playable in our game.
  */
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Word {
     pub word: String,
     pub frequency: i8,
@@ -59,7 +60,7 @@ impl Word {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Dictionary {
     pub words: Vec<Arc<Word>>,
     pub digraphs: HashSet<String>,
@@ -168,6 +169,18 @@ impl Dictionary {
             .collect();
         Ok(Self::from_words(words))
     }
+
+    /// Serialize the dictionary to binary format using bincode
+    pub fn to_binary(&self) -> Result<Vec<u8>, String> {
+        bincode::serialize(self)
+            .map_err(|e| format!("Failed to serialize dictionary: {}", e))
+    }
+
+    /// Deserialize the dictionary from binary format using bincode
+    pub fn from_binary(data: &[u8]) -> Result<Self, String> {
+        bincode::deserialize(data)
+            .map_err(|e| format!("Failed to deserialize dictionary: {}", e))
+    }
 }
 
 
@@ -220,6 +233,33 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid UTF-8"));
+    }
+
+    #[test]
+    fn test_binary_serialization_roundtrip() {
+        let words = vec![
+            Word::new("hello".to_string(), 25),
+            Word::new("world".to_string(), 30),
+            Word::new("test".to_string(), 15),
+        ];
+        let original = Dictionary::from_words(words);
+
+        // Serialize to binary
+        let binary_data = original.to_binary().expect("Should serialize");
+
+        // Deserialize from binary
+        let deserialized = Dictionary::from_binary(&binary_data).expect("Should deserialize");
+
+        // Verify words match
+        assert_eq!(original.words.len(), deserialized.words.len());
+        for (orig, deser) in original.words.iter().zip(deserialized.words.iter()) {
+            assert_eq!(orig.word, deser.word);
+            assert_eq!(orig.frequency, deser.frequency);
+            assert_eq!(orig.digraph_indices, deser.digraph_indices);
+        }
+
+        // Verify digraphs match
+        assert_eq!(original.digraphs, deserialized.digraphs);
     }
 }
 

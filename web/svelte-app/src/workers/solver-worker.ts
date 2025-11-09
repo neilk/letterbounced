@@ -40,8 +40,8 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
       if (!response.ok) {
         throw new Error(`Error fetching ${dictionaryUrl}: ${response.status} ${response.statusText}`)
       }
-      const dictionaryText = await response.text();
-      const dictionaryData = new TextEncoder().encode(dictionaryText);
+      const arrayBuffer = await response.arrayBuffer();
+      const dictionaryData = new Uint8Array(arrayBuffer);
       initialize_dictionary(dictionaryData);
       wasmReadyResolve(); // Resolve the pending promise
       self.postMessage({ type: 'READY' } as OutgoingMessage);
