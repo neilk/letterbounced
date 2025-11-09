@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Run cargo clippy before commit
+echo "Running cargo clippy..."
+cargo clippy -- -D warnings
+
+if [ $? -ne 0 ]; then
+    echo "❌ Clippy found issues. Please fix them before committing."
+    exit 1
+fi
+
+echo "✅ Clippy checks passed!"
+exit 0

@@ -16,6 +16,9 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 web-sys = "0.3"
 
+[dev-dependencies]
+cargo-husky = { version = "1", features = ["user-hooks"] }
+
 [lib]
 name = "letter_bounced"
 path = "src/lib.rs"
@@ -29,3 +32,7 @@ path = "src/main.rs"
 name = "dictionary-builder"
 path = "src/dictionary_builder.rs"
 
+[lints.clippy]
+cast_possible_truncation = "warn"
+cast_precision_loss = "warn"
+cast_sign_loss = "warn"
