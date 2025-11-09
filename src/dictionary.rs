@@ -13,7 +13,7 @@ use std::sync::Arc;
 pub struct Word {
     pub word: String,
     pub frequency: i8,
-    pub digraph_indices: Vec<u8>,
+    pub digraph_indices: Vec<u16>,
 }
 
 impl Word {
@@ -41,9 +41,9 @@ impl Word {
     }
 
     /// Create a Word with digraph indices already computed
-    pub fn with_digraph_indices(word: String, frequency: i8, digraph_to_index: &HashMap<String, u8>) -> Self {
+    pub fn with_digraph_indices(word: String, frequency: i8, digraph_to_index: &HashMap<String, u16>) -> Self {
         let digraph_strings = Self::extract_digraphs(&word);
-        let digraph_indices: Vec<u8> = digraph_strings
+        let digraph_indices: Vec<u16> = digraph_strings
             .iter()
             .filter_map(|d| digraph_to_index.get(d).copied())
             .collect();
@@ -61,7 +61,7 @@ pub struct Dictionary {
     pub words: Vec<Arc<Word>>,
     pub digraphs: HashSet<String>,
     pub root_digraph_strings: Vec<String>,  // Master list of all digraphs by index (shared across filtered dictionaries)
-    pub root_digraph_to_index: HashMap<String, u8>,  // Map digraph string to index (shared across filtered dictionaries)
+    pub root_digraph_to_index: HashMap<String, u16>,  // Map digraph string to index (shared across filtered dictionaries)
 }
 
 impl Dictionary {
@@ -78,10 +78,10 @@ impl Dictionary {
         let mut digraph_strings: Vec<String> = valid_digraphs.iter().cloned().collect();
         digraph_strings.sort(); // Sort for deterministic ordering
 
-        let digraph_to_index: HashMap<String, u8> = digraph_strings
+        let digraph_to_index: HashMap<String, u16> = digraph_strings
             .iter()
             .enumerate()
-            .map(|(i, s)| (s.clone(), i as u8))
+            .map(|(i, s)| (s.clone(), i as u16))
             .collect();
 
         // Second pass: rebuild words with digraph indices

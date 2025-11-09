@@ -135,12 +135,12 @@ impl Board {
 
     pub fn playable_dictionary(&self, dictionary: &Dictionary) -> Dictionary {
         // Build a set of usable digraph indices by checking which dictionary digraphs are playable on this board
-        let usable_digraph_indices: HashSet<u8> = dictionary.root_digraph_strings
+        let usable_digraph_indices: HashSet<u16> = dictionary.root_digraph_strings
             .iter()
             .enumerate()
             .filter_map(|(idx, digraph_str)| {
                 if self.digraphs.contains(digraph_str) {
-                    Some(idx as u8)
+                    Some(idx as u16)
                 } else {
                     None
                 }
@@ -152,7 +152,9 @@ impl Board {
             .words
             .iter()
             .filter(|word| {
-                word.digraph_indices.iter().all(|&idx| usable_digraph_indices.contains(&idx))
+                word.digraph_indices.iter().all(|&idx| 
+                    usable_digraph_indices.contains(&idx)
+                )
             })
             .cloned()
             .collect();

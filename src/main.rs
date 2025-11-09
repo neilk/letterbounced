@@ -38,6 +38,18 @@ fn validate_board_spec(board_spec: &str) -> Result<Vec<String>, String> {
     Ok(sides)
 }
 
+
+
+pub fn format_valid_digraphs(digraphs: &HashSet<String>) -> String {
+    let mut sorted_digraphs: Vec<_> = digraphs.iter().collect();
+    sorted_digraphs.sort();
+    sorted_digraphs
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn main() -> std::io::Result<()> {
     env_logger::init();
     let args = Args::parse();
@@ -90,16 +102,6 @@ fn main() -> std::io::Result<()> {
     };
 
 
-    pub fn format_valid_digraphs(digraphs: &HashSet<String>) -> String {
-        let mut sorted_digraphs: Vec<_> = digraphs.iter().collect();
-        sorted_digraphs.sort();
-        sorted_digraphs
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
     debug!("Successfully loaded game:");
     for (i, side) in board.sides.iter().enumerate() {
         debug!("Side {}: {} ({} letters)", i, side, side.len());
@@ -114,6 +116,18 @@ fn main() -> std::io::Result<()> {
     debug!("Loading dictionary from: {:?}", dictionary_path);
     match Dictionary::from_path(dictionary_path) {
         Ok(dictionary) => {
+            // Debug: Check specific digraph mappings
+            debug!("Checking digraph mappings:");
+            if let Some(&idx) = dictionary.root_digraph_to_index.get("fl") {
+                debug!("  'fl' maps to index {}, which is '{}'", idx, dictionary.root_digraph_strings[idx as usize]);
+            }
+            if let Some(&idx) = dictionary.root_digraph_to_index.get("re") {
+                debug!("  're' maps to index {}, which is '{}'", idx, dictionary.root_digraph_strings[idx as usize]);
+            }
+            if let Some(&idx) = dictionary.root_digraph_to_index.get("ar") {
+                debug!("  'ar' maps to index {}, which is '{}'", idx, dictionary.root_digraph_strings[idx as usize]);
+            }
+
             solve(board, dictionary, max_solutions);
         }
         Err(e) => eprintln!("Error loading dictionary: {}", e),
@@ -132,6 +146,17 @@ fn solve(board: Board, dictionary: Dictionary, max_solutions: u16) {
             debug!("  {}", w.word);
         }
         debug!("Total possible words: {}", board_dictionary.words.len());
+        debug!("SATANOLOGY is in the dictionary: {}", board_dictionary.words.iter().any(|w| w.word == "satanology"));
+
+        debug!(
+            "Total possible digraphs in dictionary: {}",
+            board_dictionary.digraphs.len()
+        );
+        debug!(
+            "Possible digraphs in dictionary:\n{}",
+            format_valid_digraphs(&board_dictionary.digraphs)
+        );
+
 
         // Run the solver
         debug!("\nSolving the puzzle...");
