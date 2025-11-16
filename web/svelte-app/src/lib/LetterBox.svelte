@@ -91,8 +91,11 @@
   }
 
   function handleFocusOrClick(event: MouseEvent | FocusEvent): void {
-    const target = event.target as HTMLInputElement;
-    target.select();
+    // Only auto-select text in edit mode, not play mode
+    if (!playMode) {
+      const target = event.target as HTMLInputElement;
+      target.select();
+    }
   }
 
 </script>
@@ -107,11 +110,11 @@
       class:play-mode={playMode}
       value={displayValues[index]}
       readonly={playMode}
-      on:input={(e) => handleInput(index, e)}
-      on:keydown={(e) => handleKeydown(index, e)}
-      on:click={handleFocusOrClick}
-      on:focus={handleFocusOrClick}
-      on:animationend={() => handleAnimationEnd(index)}>
+      oninput={(e) => handleInput(index, e)}
+      onkeydown={(e) => handleKeydown(index, e)}
+      onclick={handleFocusOrClick}
+      onfocus={handleFocusOrClick}
+      onanimationend={() => handleAnimationEnd(index)}>
   {/each}
 </div>
 

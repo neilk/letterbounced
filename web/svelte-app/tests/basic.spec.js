@@ -93,4 +93,66 @@ test('edit mode allows editing, play mode prevents editing', async ({ page }) =>
   await expect(firstInput).toHaveValue('C');
 });
 
+test('text selection behavior differs between play and edit modes', async ({ page }) => {
+  const inputs = getLetterInputs(page);
+  const editModeCheckbox = page.locator('#playMode');
+
+  // Switch to edit mode and add content to a field
+  await editModeCheckbox.check();
+  const firstInput = inputs.nth(0);
+  await firstInput.fill('A');
+  await expect(firstInput).toHaveValue('A');
+
+  // Switch to play mode
+  await editModeCheckbox.uncheck();
+  await expect(editModeCheckbox).not.toBeChecked();
+
+  // Click the field with content in play mode
+  await firstInput.click();
+
+  // Verify text is NOT selected in play mode
+  const notSelected = await firstInput.evaluate((el) => {
+    return el.selectionStart === el.selectionEnd;
+  });
+  expect(notSelected).toBe(true);
+
+  // Switch to edit mode
+  await editModeCheckbox.check();
+  await expect(editModeCheckbox).toBeChecked();
+
+  // Click the field with content in edit mode
+  await firstInput.click();
+
+  // Verify text IS selected in edit mode (entire content selected)
+  const isSelected = await firstInput.evaluate((el) => {
+    return el.selectionStart === 0 && el.selectionEnd === el.value.length;
+  });
+  expect(isSelected).toBe(true);
+
+  // Also test focus behavior in edit mode
+  const secondInput = inputs.nth(1);
+  await secondInput.fill('B');
+  await secondInput.focus();
+
+  // Verify text IS selected on focus in edit mode
+  const isFocusSelected = await secondInput.evaluate((el) => {
+    return el.selectionStart === 0 && el.selectionEnd === el.value.length;
+  });
+  expect(isFocusSelected).toBe(true);
+
+  // Fill third input while in edit mode
+  const thirdInput = inputs.nth(2);
+  await thirdInput.fill('C');
+
+  // Switch back to play mode and test focus
+  await editModeCheckbox.uncheck();
+  await thirdInput.focus();
+
+  // Verify text is NOT selected on focus in play mode
+  const notFocusSelected = await thirdInput.evaluate((el) => {
+    return el.selectionStart === el.selectionEnd;
+  });
+  expect(notFocusSelected).toBe(true);
+});
+
 
