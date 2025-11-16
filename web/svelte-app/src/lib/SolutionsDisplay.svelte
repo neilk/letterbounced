@@ -5,9 +5,10 @@
   interface ParsedSolution {
     words: string;
     score: string;
+    length: number;
   }
 
-  type SortOrder = 'best' | 'alphabetical';
+  type SortOrder = 'best' | 'alphabetical' | 'length';
 
   // Array indexed by word count (1-word solutions at index 1, etc.)
   let solutionsByWordCount: string[][] = [];
@@ -20,7 +21,9 @@
     const parts: string[] = solutionStr.split(':');
     const words: string = parts[0] || '';
     const score: string = parts[1] || '';
-    return { words, score };
+    // Calculate length excluding dashes
+    const length: number = words.replace(/-/g, '').length;
+    return { words, score, length };
   }
 
   // Group all solutions by word count
@@ -68,6 +71,13 @@
     const sorted: string[] = [...solutionsArray];
     if (sortOrder === 'alphabetical') {
       return sorted.sort((a: string, b: string) => a.localeCompare(b));
+    }
+    if (sortOrder === 'length') {
+      return sorted.sort((a: string, b: string) => {
+        const lengthA = parseSolution(a).length;
+        const lengthB = parseSolution(b).length;
+        return lengthA - lengthB;
+      });
     }
     // 'best' keeps the original order (already sorted by score from solver)
     return sorted;
@@ -173,6 +183,7 @@
               <select id="sort-select" bind:value={modalSortOrder}>
                 <option value="best">Best</option>
                 <option value="alphabetical">A-Z</option>
+                <option value="length">Length</option>
               </select>
             </div>
             <div class="search-control">
