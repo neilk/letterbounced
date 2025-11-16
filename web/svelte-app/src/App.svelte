@@ -96,7 +96,7 @@
   <ErrorDisplay />
 
   <div class="container">
-    <SolutionsDisplay />
+    <SolutionsDisplay playMode={$playMode} />
   </div>
 </main>
 

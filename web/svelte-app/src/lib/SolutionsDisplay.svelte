@@ -2,6 +2,9 @@
   import { solutions, solving } from '../stores/solver-worker';
   import { isPuzzleComplete } from '../stores/puzzle';
 
+  // Props
+  let { playMode = false } = $props<{ playMode?: boolean }>();
+
   interface ParsedSolution {
     words: string;
     score: string;
@@ -10,11 +13,10 @@
 
   type SortOrder = 'best' | 'alphabetical' | 'length';
 
-  // Array indexed by word count (1-word solutions at index 1, etc.)
-  let solutionsByWordCount: string[][] = [];
-  let modalSegment: number | null = null; // null or wordCount to show in modal
-  let modalSortOrder: SortOrder = 'best'; // 'best' or 'alphabetical'
-  let modalSearchQuery: string = ''; // Search query for filtering modal solutions
+  // Local state
+  let modalSegment = $state<number | null>(null); // null or wordCount to show in modal
+  let modalSortOrder = $state<SortOrder>('best'); // 'best' or 'alphabetical'
+  let modalSearchQuery = $state(''); // Search query for filtering modal solutions
 
   // Parse solution string to extract words and score
   function parseSolution(solutionStr: string): ParsedSolution {
@@ -26,8 +28,8 @@
     return { words, score, length };
   }
 
-  // Group all solutions by word count
-  $: {
+  // Group all solutions by word count (derived from $solutions)
+  const solutionsByWordCount = $derived.by(() => {
     const grouped: string[][] = [];
     $solutions.forEach((solution: string) => {
       const { words } = parseSolution(solution);
@@ -37,9 +39,8 @@
       }
       grouped[wordCount].push(solution);
     });
-    // Assign the newly created array to trigger reactivity
-    solutionsByWordCount = grouped;
-  }
+    return grouped;
+  });
 
   // Get total count for a given word count
   function getTotalCount(wordCount: number): number {
@@ -60,12 +61,14 @@
   }
 
   // Get sorted and filtered solutions for modal
-  $: modalSolutions = modalSegment !== null && solutionsByWordCount[modalSegment]
-    ? getFilteredSolutions(
-        getSortedSolutions(solutionsByWordCount[modalSegment] || [], modalSortOrder),
-        modalSearchQuery
-      )
-    : [];
+  const modalSolutions = $derived.by(() =>
+    modalSegment !== null && solutionsByWordCount[modalSegment]
+      ? getFilteredSolutions(
+          getSortedSolutions(solutionsByWordCount[modalSegment] || [], modalSortOrder),
+          modalSearchQuery
+        )
+      : []
+  );
 
   function getSortedSolutions(solutionsArray: string[], sortOrder: SortOrder): string[] {
     const sorted: string[] = [...solutionsArray];
@@ -115,7 +118,7 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="solutions-container">
+<div class="solutions-container" class:play-mode={playMode}>
   {#if $isPuzzleComplete}
     {#if $solving}
       <!-- Show loading state while solving -->
@@ -215,6 +218,10 @@
 <style>
   .solutions-container {
     margin-top: 20px;
+  }
+
+  .solutions-container.play-mode {
+    display: none;
   }
 
   .loading-state {

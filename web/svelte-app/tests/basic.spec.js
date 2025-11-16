@@ -155,4 +155,37 @@ test('text selection behavior differs between play and solve modes', async ({ pa
   expect(notFocusSelected).toBe(true);
 });
 
+test('solutions hidden in play mode, visible in solve mode', async ({ page }) => {
+  const solveModeCheckbox = page.locator('#playMode');
+  const solutionsContainer = page.locator('.solutions-container');
+
+  // Enter a puzzle in solve mode
+  await enterPuzzle(page, ['N', 'U', 'O', 'E', 'R', 'T', 'Y', 'I', 'A', 'L', 'C', 'P']);
+
+  // Wait for solutions to be generated (in solve mode)
+  await page.waitForSelector('.solution-item', { timeout: 10000 });
+
+  // Verify solutions container is visible in solve mode
+  await expect(solutionsContainer).toBeVisible();
+
+  // Verify solution items are visible in solve mode
+  const solutionItems = page.locator('.solution-item');
+  await expect(solutionItems.first()).toBeVisible();
+
+  // Switch to play mode
+  await solveModeCheckbox.uncheck();
+  await expect(solveModeCheckbox).not.toBeChecked();
+
+  // Verify solutions container is hidden (display: none) in play mode
+  await expect(solutionsContainer).toBeHidden();
+
+  // Switch back to solve mode
+  await solveModeCheckbox.check();
+  await expect(solveModeCheckbox).toBeChecked();
+
+  // Verify solutions container is visible again in solve mode
+  await expect(solutionsContainer).toBeVisible();
+  await expect(solutionItems.first()).toBeVisible();
+});
+
 
