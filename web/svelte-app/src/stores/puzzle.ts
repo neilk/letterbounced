@@ -1,4 +1,11 @@
-import { writable, derived, type Writable } from 'svelte/store';
+import { writable, derived, get, type Writable } from 'svelte/store';
+
+// Type definitions for player solutions
+// Word: array of letter indices (0-11 corresponding to puzzle positions)
+export type Word = number[];
+
+// PlayerSolution: array of words that form a complete solution
+export type PlayerSolution = Word[];
 
 // Puzzle fields store - array of 12 individual letters
 // Layout: [0-2: top, 3-5: right, 6-8: left, 9-11: bottom]
@@ -9,6 +16,9 @@ export const playMode: Writable<boolean> = writable(true);
 
 // Solutions store - array of solution strings
 export const solutions: Writable<string[]> = writable([]);
+
+// Player solution store - the user's current attempt at solving the puzzle
+export const playerSolution: Writable<PlayerSolution> = writable([]);
 
 // Solver state
 export const solverReady: Writable<boolean> = writable(false);
@@ -26,6 +36,7 @@ let autoSaveEnabled = false;
 
 interface SavedPuzzle {
   fields: string[];
+  playerSolution?: PlayerSolution;
 }
 
 // Load puzzle from localStorage
@@ -36,6 +47,12 @@ export function loadPuzzleFromStorage(): void {
       const puzzle = JSON.parse(saved) as SavedPuzzle;
       if (puzzle.fields && Array.isArray(puzzle.fields) && puzzle.fields.length === 12) {
         puzzleFields.set(puzzle.fields);
+        // Restore player solution if it exists, otherwise use empty array
+        if (puzzle.playerSolution && Array.isArray(puzzle.playerSolution)) {
+          playerSolution.set(puzzle.playerSolution as PlayerSolution);
+        } else {
+          playerSolution.set([[]] as PlayerSolution);
+        }
       }
     }
   } catch (error) {
@@ -56,18 +73,65 @@ export function setSolveMode(): void {
   playMode.set(false);
 }
 
+// Append a letter index to the current word (last word in player solution)
+// Only works in play mode
+export function appendLetterToPlayerSolution(letterIndex: number): void {
+  // Only work in play mode
+  if (!get(playMode)) return;
+
+  // Validate index is in range 0-11
+  if (letterIndex < 0 || letterIndex > 11) return;
+
+  playerSolution.update(solution => {
+    if ((!Array.isArray(solution))) {
+      solution = [[] as Word] as PlayerSolution;
+    }
+
+    // Append to last word
+    const lastWord = solution[solution.length - 1] ?? [] as Word;
+    lastWord.push(letterIndex);
+    return [...solution.slice(0, -1), lastWord];
+  });
+}
+
 // Save puzzle to localStorage
-export function savePuzzleToStorage(fields: string[]): void {
+function savePuzzleToStorage(): void {
   try {
-    localStorage.setItem('letterBoxedPuzzle', JSON.stringify({ fields }));
+    const puzzle: SavedPuzzle = {
+      fields: get(puzzleFields),
+      playerSolution: get(playerSolution)
+    };
+
+    localStorage.setItem('letterBoxedPuzzle', JSON.stringify(puzzle));
   } catch (error) {
     console.warn('Failed to save puzzle:', error);
   }
 }
 
-// Subscribe to save changes automatically (only after initial load)
+// Track previous puzzle fields to detect changes
+let previousFields: string[] = [];
+
+// Subscribe to puzzle field changes
 puzzleFields.subscribe(fields => {
   if (autoSaveEnabled) {
-    savePuzzleToStorage(fields);
+    // Check if the puzzle actually changed (not just a reference update)
+    const puzzleChanged = previousFields.length > 0 &&
+      (previousFields.length !== fields.length ||
+        previousFields.some((val, idx) => val !== fields[idx]));
+
+    if (puzzleChanged) {
+      // Reset player solution when puzzle changes
+      playerSolution.set([]);
+    }
+
+    previousFields = [...fields];
+    savePuzzleToStorage();
+  }
+});
+
+// Subscribe to player solution changes
+playerSolution.subscribe(() => {
+  if (autoSaveEnabled) {
+    savePuzzleToStorage();
   }
 });

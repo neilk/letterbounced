@@ -8,9 +8,7 @@
   import {
     puzzleFields,
     loadPuzzleFromStorage,
-    playMode,
-    setPlayMode,
-    setSolveMode
+    playMode
   } from './stores/puzzle';
   import {
     initializeSolverWorker,

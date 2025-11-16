@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { puzzleFields } from '../stores/puzzle';
+  import { puzzleFields, appendLetterToPlayerSolution } from "../stores/puzzle";
 
   // Props
   let { playMode = false } = $props<{ playMode?: boolean }>();
@@ -8,7 +8,7 @@
   const clockwiseFieldIndices = [0, 1, 2, 3, 4, 5, 8, 7, 6, 11, 10, 9];
 
   let jumping: boolean[] = $state(Array(12).fill(false));
-  let displayValues: string[] = $state(Array(12).fill(''));
+  let displayValues: string[] = $state(Array(12).fill(""));
   let sequentialTimeouts: number[] = [];
   let isUserTyping = false;
 
@@ -27,10 +27,13 @@
     // Clear any pending timeouts
     sequentialTimeouts.forEach(clearTimeout);
     // Add new timeouts for animating the letter
-    sequentialTimeouts = clockwiseFieldIndices.map((fieldIndex, sequenceIndex) => window.setTimeout(() => {
-        displayValues[fieldIndex] = fields[fieldIndex] || '';
-        jumping[fieldIndex] = true;
-      }, sequenceIndex * 50));
+    sequentialTimeouts = clockwiseFieldIndices.map(
+      (fieldIndex, sequenceIndex) =>
+        window.setTimeout(() => {
+          displayValues[fieldIndex] = fields[fieldIndex] || "";
+          jumping[fieldIndex] = true;
+        }, sequenceIndex * 50),
+    );
   });
 
   function handleInput(index: number, event: Event): void {
@@ -42,11 +45,11 @@
 
     // Only allow single uppercase letter
     if (value.length > 0) {
-      const letter = value[value.length - 1]!.replace(/[^A-Z]/g, '');
+      const letter = value[value.length - 1]!.replace(/[^A-Z]/g, "");
       target.value = letter;
 
       // Update store (effect will handle display update immediately)
-      puzzleFields.update(fields => {
+      puzzleFields.update((fields) => {
         const newFields = [...fields];
         newFields[index] = letter;
         return newFields;
@@ -57,17 +60,19 @@
 
       // Auto-advance to next field
       if (letter && index < 11) {
-        const nextField = document.getElementById(`char${String(index + 1).padStart(2, '0')}`);
+        const nextField = document.getElementById(
+          `char${String(index + 1).padStart(2, "0")}`,
+        );
         if (nextField instanceof HTMLInputElement) {
           nextField.focus();
           nextField.select();
         }
       }
     } else {
-      target.value = '';
-      puzzleFields.update(fields => {
+      target.value = "";
+      puzzleFields.update((fields) => {
         const newFields = [...fields];
-        newFields[index] = '';
+        newFields[index] = "";
         return newFields;
       });
     }
@@ -80,9 +85,11 @@
   function handleKeydown(index: number, event: KeyboardEvent): void {
     const target = event.target as HTMLInputElement;
     // Handle backspace to go to previous field
-    if (event.key === 'Backspace' && !target.value && index > 0) {
+    if (event.key === "Backspace" && !target.value && index > 0) {
       event.preventDefault();
-      const prevField = document.getElementById(`char${String(index - 1).padStart(2, '0')}`);
+      const prevField = document.getElementById(
+        `char${String(index - 1).padStart(2, "0")}`,
+      );
       if (prevField instanceof HTMLInputElement) {
         prevField.focus();
         prevField.select();
@@ -90,14 +97,27 @@
     }
   }
 
-  function handleFocusOrClick(event: MouseEvent | FocusEvent): void {
-    // Only auto-select text in solve mode, not play mode
-    if (!playMode) {
-      const target = event.target as HTMLInputElement;
-      target.select();
-    }
+  function appendToSolution(index: number): void {
+    appendLetterToPlayerSolution(index);
+    jumping[index] = true;
   }
 
+  function selectFieldText(_: number, event: MouseEvent | FocusEvent): void {
+    const target = event.target as HTMLInputElement;
+    target.select();
+  }
+
+  function noop(): void {
+    // Do nothing
+  }
+
+  let onClick, onFocus;
+  onClick = selectFieldText;
+  onFocus = selectFieldText;
+  if (playMode) {
+    onClick = appendToSolution;
+    onFocus = noop;
+  }
 </script>
 
 <div class="letter-box-container">
@@ -112,9 +132,10 @@
       readonly={playMode}
       oninput={(e) => handleInput(index, e)}
       onkeydown={(e) => handleKeydown(index, e)}
-      onclick={handleFocusOrClick}
-      onfocus={handleFocusOrClick}
-      onanimationend={() => handleAnimationEnd(index)}>
+      onclick={(e) => onClick(index, e)}
+      onfocus={(e) => onFocus(index, e)}
+      onanimationend={() => handleAnimationEnd(index)}
+    />
   {/each}
 </div>
 
@@ -156,24 +177,60 @@
   }
 
   /* Top side - char00, char01, char02 (left to right) */
-  #char00 { grid-column: 2; grid-row: 1; }
-  #char01 { grid-column: 3; grid-row: 1; }
-  #char02 { grid-column: 4; grid-row: 1; }
+  #char00 {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  #char01 {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  #char02 {
+    grid-column: 4;
+    grid-row: 1;
+  }
 
   /* Right side - char03, char04, char05 (top to bottom) */
-  #char03 { grid-column: 5; grid-row: 2; }
-  #char04 { grid-column: 5; grid-row: 3; }
-  #char05 { grid-column: 5; grid-row: 4; }
+  #char03 {
+    grid-column: 5;
+    grid-row: 2;
+  }
+  #char04 {
+    grid-column: 5;
+    grid-row: 3;
+  }
+  #char05 {
+    grid-column: 5;
+    grid-row: 4;
+  }
 
   /* Bottom side - char06, char07, char08 (top to bottom) */
-  #char06 { grid-column: 2; grid-row: 5; }
-  #char07 { grid-column: 3; grid-row: 5; }
-  #char08 { grid-column: 4; grid-row: 5; }
+  #char06 {
+    grid-column: 2;
+    grid-row: 5;
+  }
+  #char07 {
+    grid-column: 3;
+    grid-row: 5;
+  }
+  #char08 {
+    grid-column: 4;
+    grid-row: 5;
+  }
 
   /* Left side - char09, char10, char11 (left to right) */
-  #char09 { grid-column: 1; grid-row: 2; }
-  #char10 { grid-column: 1; grid-row: 3; }
-  #char11 { grid-column: 1; grid-row: 4; }
+  #char09 {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  #char10 {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  #char11 {
+    grid-column: 1;
+    grid-row: 4;
+  }
 
   /* Jump animations - each side jumps away from center */
   @keyframes jump-up {
@@ -228,28 +285,36 @@
   #char00.jump,
   #char01.jump,
   #char02.jump {
-    animation: jump-up 0.4s ease-out, color-fade 0.4s ease-out;
+    animation:
+      jump-up 0.4s ease-out,
+      color-fade 0.4s ease-out;
   }
 
   /* Right side (char03, char04, char05) - jump right with color inversion */
   #char03.jump,
   #char04.jump,
   #char05.jump {
-    animation: jump-right 0.4s ease-out, color-fade 0.4s ease-out;
+    animation:
+      jump-right 0.4s ease-out,
+      color-fade 0.4s ease-out;
   }
 
   /* Bottom side (char06, char07, char08) - jump down with color inversion */
   #char06.jump,
   #char07.jump,
   #char08.jump {
-    animation: jump-down 0.4s ease-out, color-fade 0.4s ease-out;
+    animation:
+      jump-down 0.4s ease-out,
+      color-fade 0.4s ease-out;
   }
 
   /* Left side (char09, char10, char11) - jump left with color inversion */
   #char09.jump,
   #char10.jump,
   #char11.jump {
-    animation: jump-left 0.4s ease-out, color-fade 0.4s ease-out;
+    animation:
+      jump-left 0.4s ease-out,
+      color-fade 0.4s ease-out;
   }
 
   /* Color inversion animation - instant invert, slow fade back */
