@@ -91,7 +91,7 @@
   }
 
   function handleFocusOrClick(event: MouseEvent | FocusEvent): void {
-    // Only auto-select text in edit mode, not play mode
+    // Only auto-select text in solve mode, not play mode
     if (!playMode) {
       const target = event.target as HTMLInputElement;
       target.select();

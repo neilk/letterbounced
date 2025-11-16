@@ -4,7 +4,7 @@ import { writable, derived, type Writable } from 'svelte/store';
 // Layout: [0-2: top, 3-5: right, 6-8: left, 9-11: bottom]
 export const puzzleFields: Writable<string[]> = writable(Array(12).fill(''));
 
-// Mode store - true for play mode, false for edit mode
+// Mode store - true for play mode, false for solve mode
 export const playMode: Writable<boolean> = writable(true);
 
 // Solutions store - array of solution strings
@@ -51,8 +51,8 @@ export function setPlayMode(): void {
   playMode.set(true);
 }
 
-// Set edit mode
-export function setEditMode(): void {
+// Set solve mode
+export function setSolveMode(): void {
   playMode.set(false);
 }
 

@@ -5,9 +5,9 @@ function getLetterInputs(page) {
 }
 
 async function enterPuzzle(page, letters) {
-  // Switch to edit mode first to enable editing
-  const editModeCheckbox = page.locator('#playMode');
-  await editModeCheckbox.check();
+  // Switch to solve mode first to enable editing
+  const solveModeCheckbox = page.locator('#playMode');
+  await solveModeCheckbox.check();
 
   const inputs = getLetterInputs(page);
   for (let i = 0; i < letters.length; i++) {
@@ -49,31 +49,31 @@ test('puzzle with no solutions', async ({ page }) => {
   await expect(noSolutionsMessage).toBeVisible({ timeout: 10000 });
 });
 
-test('edit mode allows editing, play mode prevents editing', async ({ page }) => {
+test('solve mode allows editing, play mode prevents editing', async ({ page }) => {
   const inputs = getLetterInputs(page);
   const firstInput = inputs.nth(0);
-  const editModeCheckbox = page.locator('#playMode');
+  const solveModeCheckbox = page.locator('#playMode');
 
   // Play mode should be active by default (checkbox unchecked)
-  await expect(editModeCheckbox).not.toBeChecked();
+  await expect(solveModeCheckbox).not.toBeChecked();
 
   // Verify input is readonly in play mode
   await expect(firstInput).toHaveAttribute('readonly', '');
 
-  // Switch to edit mode by checking the checkbox
-  await editModeCheckbox.check();
-  await expect(editModeCheckbox).toBeChecked();
+  // Switch to solve mode by checking the checkbox
+  await solveModeCheckbox.check();
+  await expect(solveModeCheckbox).toBeChecked();
 
-  // Verify input is NOT readonly in edit mode
+  // Verify input is NOT readonly in solve mode
   await expect(firstInput).not.toHaveAttribute('readonly');
 
-  // Verify we can edit in edit mode
+  // Verify we can edit in solve mode
   await firstInput.fill('A');
   await expect(firstInput).toHaveValue('A');
 
-  // Switch to play mode by unchecking the edit mode checkbox
-  await editModeCheckbox.uncheck();
-  await expect(editModeCheckbox).not.toBeChecked();
+  // Switch to play mode by unchecking the solve mode checkbox
+  await solveModeCheckbox.uncheck();
+  await expect(solveModeCheckbox).not.toBeChecked();
 
   // Verify input is readonly in play mode (Playwright won't fill readonly inputs)
   await expect(firstInput).toHaveAttribute('readonly', '');
@@ -81,31 +81,31 @@ test('edit mode allows editing, play mode prevents editing', async ({ page }) =>
   // The value should remain unchanged in play mode
   await expect(firstInput).toHaveValue('A');
 
-  // Switch back to edit mode by checking the checkbox
-  await editModeCheckbox.check();
-  await expect(editModeCheckbox).toBeChecked();
+  // Switch back to solve mode by checking the checkbox
+  await solveModeCheckbox.check();
+  await expect(solveModeCheckbox).toBeChecked();
 
   // Verify input is no longer readonly
   await expect(firstInput).not.toHaveAttribute('readonly');
 
-  // Verify we can edit again in edit mode
+  // Verify we can edit again in solve mode
   await firstInput.fill('C');
   await expect(firstInput).toHaveValue('C');
 });
 
-test('text selection behavior differs between play and edit modes', async ({ page }) => {
+test('text selection behavior differs between play and solve modes', async ({ page }) => {
   const inputs = getLetterInputs(page);
-  const editModeCheckbox = page.locator('#playMode');
+  const solveModeCheckbox = page.locator('#playMode');
 
-  // Switch to edit mode and add content to a field
-  await editModeCheckbox.check();
+  // Switch to solve mode and add content to a field
+  await solveModeCheckbox.check();
   const firstInput = inputs.nth(0);
   await firstInput.fill('A');
   await expect(firstInput).toHaveValue('A');
 
   // Switch to play mode
-  await editModeCheckbox.uncheck();
-  await expect(editModeCheckbox).not.toBeChecked();
+  await solveModeCheckbox.uncheck();
+  await expect(solveModeCheckbox).not.toBeChecked();
 
   // Click the field with content in play mode
   await firstInput.click();
@@ -116,36 +116,36 @@ test('text selection behavior differs between play and edit modes', async ({ pag
   });
   expect(notSelected).toBe(true);
 
-  // Switch to edit mode
-  await editModeCheckbox.check();
-  await expect(editModeCheckbox).toBeChecked();
+  // Switch to solve mode
+  await solveModeCheckbox.check();
+  await expect(solveModeCheckbox).toBeChecked();
 
-  // Click the field with content in edit mode
+  // Click the field with content in solve mode
   await firstInput.click();
 
-  // Verify text IS selected in edit mode (entire content selected)
+  // Verify text IS selected in solve mode (entire content selected)
   const isSelected = await firstInput.evaluate((el) => {
     return el.selectionStart === 0 && el.selectionEnd === el.value.length;
   });
   expect(isSelected).toBe(true);
 
-  // Also test focus behavior in edit mode
+  // Also test focus behavior in solve mode
   const secondInput = inputs.nth(1);
   await secondInput.fill('B');
   await secondInput.focus();
 
-  // Verify text IS selected on focus in edit mode
+  // Verify text IS selected on focus in solve mode
   const isFocusSelected = await secondInput.evaluate((el) => {
     return el.selectionStart === 0 && el.selectionEnd === el.value.length;
   });
   expect(isFocusSelected).toBe(true);
 
-  // Fill third input while in edit mode
+  // Fill third input while in solve mode
   const thirdInput = inputs.nth(2);
   await thirdInput.fill('C');
 
   // Switch back to play mode and test focus
-  await editModeCheckbox.uncheck();
+  await solveModeCheckbox.uncheck();
   await thirdInput.focus();
 
   // Verify text is NOT selected on focus in play mode

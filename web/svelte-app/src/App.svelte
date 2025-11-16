@@ -9,7 +9,7 @@
     loadPuzzleFromStorage,
     playMode,
     setPlayMode,
-    setEditMode
+    setSolveMode
   } from './stores/puzzle';
   import {
     initializeSolverWorker,
@@ -82,7 +82,7 @@
         checked={!$playMode}
         on:change={(e) => playMode.set(!(e.target as HTMLInputElement).checked)}
       >
-      <span>Edit Mode</span>
+      <span>Solve Mode</span>
     </label>
   </div>
 
