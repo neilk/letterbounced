@@ -188,4 +188,57 @@ test('solutions hidden in play mode, visible in solve mode', async ({ page }) =>
   await expect(solutionItems.first()).toBeVisible();
 });
 
+test('player solution displays clicked letters in play mode', async ({ page }) => {
+  const solveModeCheckbox = page.locator('#playMode');
+  const inputs = getLetterInputs(page);
+  const playerSolutionContainer = page.locator('.player-solution-container');
+
+  // Enter a puzzle in solve mode
+  // Using the puzzle: N U O (top), E R T (right), Y I A (bottom), L C P (left)
+  await enterPuzzle(page, ['N', 'U', 'O', 'E', 'R', 'T', 'Y', 'I', 'A', 'L', 'C', 'P']);
+
+  // Switch to play mode
+  await solveModeCheckbox.uncheck();
+  await expect(solveModeCheckbox).not.toBeChecked();
+
+  // Verify player solution container is visible in play mode
+  await expect(playerSolutionContainer).toBeVisible();
+
+  // Verify initial state shows placeholder message
+  await expect(playerSolutionContainer).toContainText(/Click letters to start/i);
+
+  // Click letters to form a word: N(0) -> E(3) -> U(1) -> R(4) -> A(8) -> L(9)
+  // This spells "NEURAL"
+  await inputs.nth(0).click();  // N
+  await page.waitForTimeout(100); // Small delay to ensure state updates
+  await expect(playerSolutionContainer).toContainText('N');
+
+  await inputs.nth(3).click();  // E
+  await page.waitForTimeout(100);
+  await expect(playerSolutionContainer).toContainText('NE');
+
+  await inputs.nth(1).click();  // U
+  await page.waitForTimeout(100);
+  await expect(playerSolutionContainer).toContainText('NEU');
+
+  await inputs.nth(4).click();  // R
+  await page.waitForTimeout(100);
+  await expect(playerSolutionContainer).toContainText('NEUR');
+
+  await inputs.nth(8).click();  // A
+  await page.waitForTimeout(100);
+  await expect(playerSolutionContainer).toContainText('NEURA');
+
+  await inputs.nth(9).click();  // L
+  await page.waitForTimeout(100);
+  await expect(playerSolutionContainer).toContainText('NEURAL');
+
+  // Verify the full word is displayed
+  const wordSpan = playerSolutionContainer.locator('.word');
+  await expect(wordSpan).toHaveText('NEURAL');
+
+  // Verify placeholder message is no longer visible
+  await expect(playerSolutionContainer).not.toContainText(/Click letters to start/i);
+});
+
 

@@ -111,13 +111,9 @@
     // Do nothing
   }
 
-  let onClick, onFocus;
-  onClick = selectFieldText;
-  onFocus = selectFieldText;
-  if (playMode) {
-    onClick = appendToSolution;
-    onFocus = noop;
-  }
+  // Make handlers reactive to playMode changes
+  let onClick = $derived(playMode ? appendToSolution : selectFieldText);
+  let onFocus = $derived(playMode ? noop : selectFieldText);
 </script>
 
 <div class="letter-box-container">
