@@ -241,4 +241,59 @@ test('player solution displays clicked letters in play mode', async ({ page }) =
   await expect(playerSolutionContainer).not.toContainText(/Click letters to start/i);
 });
 
+test('backspace button removes letters in play mode', async ({ page }) => {
+  const solveModeCheckbox = page.locator('#playMode');
+  const inputs = getLetterInputs(page);
+  const playerSolutionContainer = page.locator('.player-solution-wrapper');
+  const backspaceButton = page.locator('.backspace-button');
+
+  // Enter a puzzle in solve mode
+  await enterPuzzle(page, ['N', 'U', 'O', 'E', 'R', 'T', 'Y', 'I', 'A', 'L', 'C', 'P']);
+
+  // Switch to play mode
+  await solveModeCheckbox.uncheck();
+  await expect(solveModeCheckbox).not.toBeChecked();
+
+  // Verify backspace button is not visible initially (no content)
+  await expect(backspaceButton).not.toBeVisible();
+
+  // Click two letters: N(0) -> E(3)
+  await inputs.nth(0).click();  // N
+  await page.waitForTimeout(100);
+  await expect(playerSolutionContainer).toContainText('N');
+
+  // Verify backspace button is now visible
+  await expect(backspaceButton).toBeVisible();
+
+  await inputs.nth(3).click();  // E
+  await page.waitForTimeout(100);
+  await expect(playerSolutionContainer).toContainText('NE');
+
+  // Verify the full content
+  const wordSpan = playerSolutionContainer.locator('.word');
+  await expect(wordSpan).toHaveText('NE');
+
+  // Click backspace once
+  await backspaceButton.click();
+  await page.waitForTimeout(100);
+
+  // Verify final letter was removed, should show "N"
+  await expect(wordSpan).toHaveText('N');
+  await expect(playerSolutionContainer).toContainText('N');
+  await expect(playerSolutionContainer).not.toContainText('NE');
+
+  // Backspace button should still be visible
+  await expect(backspaceButton).toBeVisible();
+
+  // Click backspace again
+  await backspaceButton.click();
+  await page.waitForTimeout(100);
+
+  // Verify it's now blank - should show placeholder message
+  await expect(playerSolutionContainer).toContainText(/Click letters to start/i);
+
+  // Backspace button should no longer be visible
+  await expect(backspaceButton).not.toBeVisible();
+});
+
 
