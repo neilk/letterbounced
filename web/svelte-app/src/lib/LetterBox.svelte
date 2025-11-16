@@ -1,6 +1,9 @@
 <script lang="ts">
   import { puzzleFields } from '../stores/puzzle';
 
+  // Props
+  let { playMode = false } = $props<{ playMode?: boolean }>();
+
   // Order: clockwise starting from top-left
   const clockwiseFieldIndices = [0, 1, 2, 3, 4, 5, 8, 7, 6, 11, 10, 9];
 
@@ -101,7 +104,9 @@
       id="char{String(index).padStart(2, '0')}"
       class="letter-field"
       class:jump={jumping[index]}
+      class:play-mode={playMode}
       value={displayValues[index]}
+      readonly={playMode}
       on:input={(e) => handleInput(index, e)}
       on:keydown={(e) => handleKeydown(index, e)}
       on:click={handleFocusOrClick}
@@ -140,6 +145,11 @@
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--color-primary-light);
+  }
+
+  .letter-field.play-mode {
+    cursor: default;
+    background: var(--color-bg-container, #f8f9fa);
   }
 
   /* Top side - char00, char01, char02 (left to right) */

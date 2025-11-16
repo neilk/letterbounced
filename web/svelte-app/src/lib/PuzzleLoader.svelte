@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { puzzleFields } from '../stores/puzzle';
+  import { puzzleFields, setPlayMode } from '../stores/puzzle';
 
   interface ExamplePuzzle {
     label: string;
@@ -49,6 +49,8 @@
 
       // Update puzzle store (effect in LetterBox will handle display and animation)
       puzzleFields.set(fields);
+      // Set to play mode when loading a puzzle
+      setPlayMode();
     } catch (error) {
       const message: string = error instanceof Error ? error.message : 'Unknown error';
       alert('Failed to load today\'s puzzle: ' + message);
@@ -71,6 +73,8 @@
 
       // Update puzzle store (effect in LetterBox will handle display and animation)
       puzzleFields.set(fields);
+      // Set to play mode when loading a puzzle
+      setPlayMode();
     }
 
     // Reset dropdown

@@ -6,7 +6,10 @@
   import ErrorDisplay from './lib/ErrorDisplay.svelte';
   import {
     puzzleFields,
-    loadPuzzleFromStorage
+    loadPuzzleFromStorage,
+    playMode,
+    setPlayMode,
+    setEditMode
   } from './stores/puzzle';
   import {
     initializeSolverWorker,
@@ -71,9 +74,21 @@
     <PuzzleLoader />
   </div>
 
+  <div class="mode-toggle">
+    <label class="mode-checkbox">
+      <input
+        type="checkbox"
+        id="playMode"
+        checked={!$playMode}
+        on:change={(e) => playMode.set(!(e.target as HTMLInputElement).checked)}
+      >
+      <span>Edit Mode</span>
+    </label>
+  </div>
+
   <div class="container">
     <div class="game-input">
-      <LetterBox />
+      <LetterBox playMode={$playMode} />
     </div>
   </div>
 
@@ -130,5 +145,32 @@
     padding: 10px;
     border-radius: 4px;
     margin: 10px 0;
+  }
+
+  .mode-toggle {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+  }
+
+  .mode-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+    user-select: none;
+  }
+
+  .mode-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
+  .mode-checkbox:hover {
+    color: var(--color-primary);
   }
 </style>
