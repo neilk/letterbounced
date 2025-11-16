@@ -71,7 +71,7 @@ impl Dictionary {
     }
 
     fn parse_word_line(line: &str) -> Option<Word> {
-        let mut parts = line.trim().split_whitespace();
+        let mut parts = line.split_whitespace();
         match (parts.next(), parts.next()) {
             (Some(word_str), Some(frequency_str)) => match frequency_str.parse::<i8>() {
                 Ok(frequency) => Some(Word::new(word_str.to_string(), frequency)),
