@@ -94,6 +94,37 @@ export function appendLetterToPlayerSolution(letterIndex: number): void {
   });
 }
 
+// Remove the last letter from the player solution (backspace)
+// Only works in play mode
+export function backspacePlayerSolution(): void {
+  // Only work in play mode
+  if (!get(playMode)) return;
+
+  playerSolution.update(solution => {
+    if (!Array.isArray(solution) || solution.length === 0) {
+      return solution;
+    }
+
+    // Get the last word
+    const lastWord = solution[solution.length - 1];
+    if (!lastWord || lastWord.length === 0) {
+      // If last word is empty, remove it
+      return solution.slice(0, -1);
+    }
+
+    // Remove last letter from last word
+    const newLastWord = lastWord.slice(0, -1);
+
+    // If the word is now empty, remove it entirely
+    if (newLastWord.length === 0) {
+      return solution.slice(0, -1);
+    }
+
+    // Otherwise, update with the shortened word
+    return [...solution.slice(0, -1), newLastWord];
+  });
+}
+
 // Save puzzle to localStorage
 function savePuzzleToStorage(): void {
   try {
