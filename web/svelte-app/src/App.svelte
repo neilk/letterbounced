@@ -4,6 +4,7 @@
   import LetterBox from './lib/LetterBox.svelte';
   import SolutionsDisplay from './lib/SolutionsDisplay.svelte';
   import ErrorDisplay from './lib/ErrorDisplay.svelte';
+  import PlayerSolution from './lib/PlayerSolution.svelte';
   import {
     puzzleFields,
     loadPuzzleFromStorage,
@@ -97,6 +98,7 @@
 
   <div class="container">
     <SolutionsDisplay playMode={$playMode} />
+    <PlayerSolution playMode={$playMode} />
   </div>
 </main>
 
