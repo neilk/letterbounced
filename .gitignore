@@ -3,3 +3,4 @@
 data/google-ngrams-words-all.txt
 web/dictionary.txt
 .playwright-mcp
+.vscode/
