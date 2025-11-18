@@ -79,7 +79,7 @@
         type="checkbox"
         id="playMode"
         checked={!$playMode}
-        on:change={(e) => playMode.set(!(e.target as HTMLInputElement).checked)}
+        onchange={(e) => playMode.set(!(e.target as HTMLInputElement).checked)}
       >
       <span>Solve Mode</span>
     </label>

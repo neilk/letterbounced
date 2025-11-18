@@ -143,7 +143,7 @@
               {#if showButton}
                 <button
                   class="show-all-btn"
-                  on:click={() => showModal(wordCount)}
+                  onclick={() => showModal(wordCount)}
                 >
                   Show all {total}
                 </button>
@@ -170,11 +170,11 @@
 
 <!-- Modal -->
 {#if modalSegment !== null}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-  <div tabindex="0" class="modal-overlay" on:click={closeModal} role="dialog" aria-modal="true">
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="modal-content" on:click|stopPropagation role="document">
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div tabindex="0" class="modal-overlay" onclick={closeModal} role="dialog" aria-modal="true">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="modal-content" onclick={(e) => { e.stopPropagation(); }} role="document">
       <div class="modal-header">
         <div class="modal-header-left">
           <h3>{modalSegment}-word solutions 
@@ -200,7 +200,7 @@
             </div>
           </div>
         </div>
-        <button class="close-btn" on:click={closeModal}>&times;</button>
+        <button class="close-btn" onclick={closeModal}>&times;</button>
       </div>
       <div class="modal-body">
         {#each modalSolutions as solution}

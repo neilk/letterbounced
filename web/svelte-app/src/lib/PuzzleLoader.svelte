@@ -87,7 +87,7 @@
 <div class="puzzle-loader">
   <span class="puzzle-loader-label">Enter a puzzle, or</span>
   <div class="pill-select-wrapper">
-    <select class="pill-select" on:change={handlePuzzleSelection} disabled={loading}>
+    <select class="pill-select" onchange={handlePuzzleSelection} disabled={loading}>
       <option value="">{loading ? 'Loading...' : 'choose a puzzle'}</option>
       <option value={NYT_TODAY_VALUE}>Today's New York Times</option>
       {#each examplePuzzles as puzzle}
