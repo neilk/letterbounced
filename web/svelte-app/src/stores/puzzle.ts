@@ -122,29 +122,6 @@ export function setSolveMode(): void {
   playMode.set(false);
 }
 
-export function isLetterAppendable(letterIndex: number): boolean {
-  if (!get(playMode)) return false;
-
-  const state = get(puzzleState);
-  const solution = state.playerSolution;
-  if (!Array.isArray(solution) || solution.length === 0) {
-    return true; // Can always append to start a new word
-  }
-
-  const lastWord = solution[solution.length - 1];
-  if (!lastWord || lastWord.length === 0) {
-    return true; // Can append to an empty last word
-  }
-  
-  const lastLetterIndex = lastWord[lastWord.length - 1];
-  if (lastLetterIndex === undefined) {
-    return true; // Can append if no previous letter exists
-  }
-
-  // This assumes a 12-letter puzzle arranged in 4 rows of 3 letters each
-  return Math.floor(lastLetterIndex/3) != Math.floor(letterIndex/3);
-}
-
 // Append a letter index to the current word (last word in player solution)
 // Only works in play mode
 export function appendLetterToPlayerSolution(letterIndex: number): void {
@@ -155,6 +132,11 @@ export function appendLetterToPlayerSolution(letterIndex: number): void {
   if (letterIndex < 0 || letterIndex > 11) {
     throw new Error('Letter index out of range: ' + letterIndex);
   };
+
+  // Check if letter is appendable
+  if (!get(appendableFields)[letterIndex]) {
+    throw new Error(`Cannot append letter ${letterIndex}: not appendable from current position`);
+  }
 
   puzzleState.update(state => {
     let solution = state.playerSolution;
