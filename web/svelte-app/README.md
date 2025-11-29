@@ -74,6 +74,69 @@ npm run preview
 - Serves the `dist/` folder at http://localhost:4173/
 - Use this to verify the production build works before deploying
 
+## Testing
+
+The project includes both unit tests and end-to-end tests.
+
+### Test Structure
+
+```
+tests/
+├── browser/           # Playwright e2e tests
+│   ├── basic.spec.js
+│   ├── edit-fields.spec.js
+│   ├── fixture.ts
+│   └── player-solution-reload.spec.js
+└── unit/             # Vitest unit tests
+    └── puzzle.test.ts
+```
+
+### Unit Tests (Vitest)
+
+Test individual store functions and business logic without browser interaction.
+
+**Make sure you are in the `web/svelte-app/` directory:**
+
+```bash
+# Run unit tests once
+npm test
+
+# Run unit tests in watch mode
+npm run test:watch
+
+# Open Vitest UI
+npm run test:ui
+```
+
+**What's tested:**
+- Puzzle state management (`puzzle.ts` store)
+- Player solution logic
+- Appendable field validation
+- Mode switching (play/solve)
+
+### End-to-End Tests (Playwright)
+
+Test the full application in a browser, including user interactions.
+
+**Make sure you are in the `web/svelte-app/` directory:**
+
+```bash
+# Run e2e tests
+npm run test:e2e
+
+# Run e2e tests with UI
+npm run test:e2e:ui
+```
+
+**What's tested:**
+- Complete user workflows
+- UI interactions and state updates
+- Letter input and validation
+- Solution display and persistence
+- Mode switching behavior
+
+**Note:** E2E tests automatically start the dev server before running.
+
 ## Deployment
 
 The `dist/` folder contains everything needed for deployment:

@@ -118,6 +118,19 @@ The web application has been migrated from vanilla HTML/JS to Svelte for better 
 - `cd web/svelte-app && npm install` - Install dependencies
 - `npm run dev` - Start development server (http://localhost:5173/)
 - `npm run build` - Build for production
+- `npm test` - Run unit tests (Vitest)
+- `npm run test:watch` - Run unit tests in watch mode
+- `npm run test:e2e` - Run end-to-end tests (Playwright)
+
+**Testing**:
+- **Unit tests** (`tests/unit/`): Vitest tests for store logic and business rules
+  - Tests puzzle state management, player solution logic, appendability validation
+  - Uses localStorage mock for Node environment
+  - Fast, isolated tests without browser
+- **E2E tests** (`tests/browser/`): Playwright tests for full user workflows
+  - Tests complete UI interactions and state updates
+  - Runs in real browser with dev server
+  - Validates user experience end-to-end
 
 **Architecture**:
 - **Stores** (`src/stores/`):
