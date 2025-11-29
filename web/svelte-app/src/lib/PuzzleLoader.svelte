@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { puzzleFields, setPlayMode } from '../stores/puzzle';
+  import { loadPuzzle, setPlayMode } from '../stores/puzzle';
 
   interface ExamplePuzzle {
     label: string;
     value: string;
   }
+
+  let { onPuzzleLoaded = () => {} } = $props<{ onPuzzleLoaded?: () => void }>();
 
   let loading: boolean = false;
 
@@ -47,10 +49,12 @@
       // Convert sides array to fields array
       const fields: string[] = sidesData.flatMap((side: string) => side.split(''));
 
-      // Update puzzle store (effect in LetterBox will handle display and animation)
-      puzzleFields.set(fields);
+      // Load new puzzle (atomically sets fields and clears solution)
+      loadPuzzle(fields);
       // Set to play mode when loading a puzzle
       setPlayMode();
+      // Trigger animation
+      onPuzzleLoaded();
     } catch (error) {
       const message: string = error instanceof Error ? error.message : 'Unknown error';
       alert('Failed to load today\'s puzzle: ' + message);
@@ -71,10 +75,12 @@
       // Convert string of 12 letters to array
       const fields: string[] = value.split('');
 
-      // Update puzzle store (effect in LetterBox will handle display and animation)
-      puzzleFields.set(fields);
+      // Load new puzzle (atomically sets fields and clears solution)
+      loadPuzzle(fields);
       // Set to play mode when loading a puzzle
       setPlayMode();
+      // Trigger animation
+      onPuzzleLoaded();
     }
 
     // Reset dropdown

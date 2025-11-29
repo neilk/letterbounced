@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { puzzleFields, appendLetterToPlayerSolution } from "../stores/puzzle";
+  import { puzzleFields, appendLetterToPlayerSolution, updatePuzzleField } from "../stores/puzzle";
 
   // Props
   let { playMode = false } = $props<{ playMode?: boolean }>();
@@ -8,52 +8,33 @@
   const clockwiseFieldIndices = [0, 1, 2, 3, 4, 5, 8, 7, 6, 11, 10, 9];
 
   let jumping: boolean[] = $state(Array(12).fill(false));
-  let displayValues: string[] = $state(Array(12).fill(""));
   let sequentialTimeouts: number[] = [];
-  let isUserTyping = false;
 
-  // Effect to watch puzzleFields and update display sequentially when not typing
-  $effect(() => {
-    const fields = $puzzleFields;
-
-    // If user is typing, update immediately
-    if (isUserTyping) {
-      displayValues = [...fields];
-      isUserTyping = false;
-      return;
-    }
-
-    // Otherwise, animate sequentially (for puzzle loads)
+  // Animate all letters in sequence (called explicitly when loading from menu)
+  export function animatePuzzleLoad(): void {
     // Clear any pending timeouts
     sequentialTimeouts.forEach(clearTimeout);
-    // Add new timeouts for animating the letter
+
+    // Animate each letter sequentially
     sequentialTimeouts = clockwiseFieldIndices.map(
       (fieldIndex, sequenceIndex) =>
         window.setTimeout(() => {
-          displayValues[fieldIndex] = fields[fieldIndex] || "";
           jumping[fieldIndex] = true;
         }, sequenceIndex * 50),
     );
-  });
+  }
 
   function handleInput(index: number, event: Event): void {
     const target = event.target as HTMLInputElement;
     const value = target.value.toUpperCase();
-
-    // Mark that user is typing (to skip sequential animation)
-    isUserTyping = true;
 
     // Only allow single uppercase letter
     if (value.length > 0) {
       const letter = value[value.length - 1]!.replace(/[^A-Z]/g, "");
       target.value = letter;
 
-      // Update store (effect will handle display update immediately)
-      puzzleFields.update((fields) => {
-        const newFields = [...fields];
-        newFields[index] = letter;
-        return newFields;
-      });
+      // Update field (atomically updates field and clears solution)
+      updatePuzzleField(index, letter);
 
       // Trigger jump animation (includes color inversion)
       jumping[index] = true;
@@ -70,11 +51,8 @@
       }
     } else {
       target.value = "";
-      puzzleFields.update((fields) => {
-        const newFields = [...fields];
-        newFields[index] = "";
-        return newFields;
-      });
+      // Clear field (atomically updates field and clears solution)
+      updatePuzzleField(index, "");
     }
   }
 
@@ -124,7 +102,7 @@
       class="letter-field"
       class:jump={jumping[index]}
       class:play-mode={playMode}
-      value={displayValues[index]}
+      value={$puzzleFields[index]}
       readonly={playMode}
       oninput={(e) => handleInput(index, e)}
       onkeydown={(e) => handleKeydown(index, e)}

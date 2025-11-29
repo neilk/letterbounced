@@ -7,7 +7,6 @@
   import PlayerSolution from './lib/PlayerSolution.svelte';
   import {
     puzzleFields,
-    loadPuzzleFromStorage,
     playMode
   } from './stores/puzzle';
   import {
@@ -19,11 +18,9 @@
   import { throttle } from './utils/throttle';
 
   let initError: string | null = null;
+  let letterBox: any;
 
   onMount(async () => {
-    // Load saved puzzle from localStorage
-    loadPuzzleFromStorage();
-
     // Initialize solver worker with dictionary
     try {
       const response = await fetch('./dictionary.txt');
@@ -70,7 +67,7 @@
   {/if}
 
   <div class="example">
-    <PuzzleLoader />
+    <PuzzleLoader onPuzzleLoaded={() => letterBox?.animatePuzzleLoad()} />
   </div>
 
   <div class="mode-toggle">
@@ -87,7 +84,7 @@
 
   <div class="container">
     <div class="game-input">
-      <LetterBox playMode={$playMode} />
+      <LetterBox bind:this={letterBox} playMode={$playMode} />
     </div>
   </div>
 

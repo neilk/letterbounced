@@ -7,18 +7,47 @@ export type Word = number[];
 // PlayerSolution: array of words that form a complete solution
 export type PlayerSolution = Word[];
 
-// Puzzle fields store - array of 12 individual letters
-// Layout: [0-2: top, 3-5: right, 6-8: left, 9-11: bottom]
-export const puzzleFields: Writable<string[]> = writable(Array(12).fill(''));
+// Combined puzzle state
+interface PuzzleState {
+  fields: string[];
+  playerSolution: PlayerSolution;
+}
+
+// Load initial state from localStorage (runs once at module load)
+function loadInitialState(): PuzzleState {
+  try {
+    const saved = localStorage.getItem('letterBoxedPuzzle');
+    if (saved) {
+      const puzzle = JSON.parse(saved);
+      if (puzzle.fields && Array.isArray(puzzle.fields) && puzzle.fields.length === 12) {
+        return {
+          fields: puzzle.fields,
+          playerSolution: puzzle.playerSolution || []
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to load saved puzzle:', error);
+  }
+  // Default state
+  return {
+    fields: Array(12).fill(''),
+    playerSolution: []
+  };
+}
+
+// Single source of truth - atomic puzzle state
+const puzzleState = writable<PuzzleState>(loadInitialState());
+
+// Derived stores for component access
+export const puzzleFields = derived(puzzleState, $state => $state.fields);
+export const playerSolution = derived(puzzleState, $state => $state.playerSolution);
 
 // Mode store - true for play mode, false for solve mode
 export const playMode: Writable<boolean> = writable(true);
 
 // Solutions store - array of solution strings
 export const solutions: Writable<string[]> = writable([]);
-
-// Player solution store - the user's current attempt at solving the puzzle
-export const playerSolution: Writable<PlayerSolution> = writable([]);
 
 // Solver state
 export const solverReady: Writable<boolean> = writable(false);
@@ -31,36 +60,29 @@ export const isPuzzleComplete = derived(
   ($fields) => $fields.every(field => field.length === 1 && /^[A-Z]$/.test(field))
 );
 
-// Flag to control auto-saving
-let autoSaveEnabled = false;
+// Subscribe to state changes and save to localStorage
+puzzleState.subscribe(state => {
+  try {
+    localStorage.setItem('letterBoxedPuzzle', JSON.stringify(state));
+  } catch (error) {
+    console.warn('Failed to save puzzle:', error);
+  }
+});
 
-interface SavedPuzzle {
-  fields: string[];
-  playerSolution?: PlayerSolution;
+// Load a new puzzle (clears player solution)
+export function loadPuzzle(fields: string[]): void {
+  puzzleState.set({
+    fields,
+    playerSolution: []
+  });
 }
 
-// Load puzzle from localStorage
-export function loadPuzzleFromStorage(): void {
-  try {
-    const saved = localStorage.getItem('letterBoxedPuzzle');
-    if (saved) {
-      const puzzle = JSON.parse(saved) as SavedPuzzle;
-      if (puzzle.fields && Array.isArray(puzzle.fields) && puzzle.fields.length === 12) {
-        puzzleFields.set(puzzle.fields);
-        // Restore player solution if it exists, otherwise use empty array
-        if (puzzle.playerSolution && Array.isArray(puzzle.playerSolution)) {
-          playerSolution.set(puzzle.playerSolution as PlayerSolution);
-        } else {
-          playerSolution.set([[]] as PlayerSolution);
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to load saved puzzle:', error);
-  } finally {
-    // Enable auto-save after loading is complete
-    autoSaveEnabled = true;
-  }
+// Update a single puzzle field (clears player solution)
+export function updatePuzzleField(index: number, letter: string): void {
+  puzzleState.update(state => ({
+    fields: state.fields.map((f, i) => i === index ? letter : f),
+    playerSolution: []  // Clear solution when puzzle is edited
+  }));
 }
 
 // Set play mode (called when a puzzle is loaded from selection)
@@ -82,15 +104,21 @@ export function appendLetterToPlayerSolution(letterIndex: number): void {
   // Validate index is in range 0-11
   if (letterIndex < 0 || letterIndex > 11) return;
 
-  playerSolution.update(solution => {
-    if ((!Array.isArray(solution))) {
+  puzzleState.update(state => {
+    let solution = state.playerSolution;
+    if (!Array.isArray(solution)) {
       solution = [[] as Word] as PlayerSolution;
     }
 
     // Append to last word
     const lastWord = solution[solution.length - 1] ?? [] as Word;
-    lastWord.push(letterIndex);
-    return [...solution.slice(0, -1), lastWord];
+    const updatedLastWord = [...lastWord, letterIndex];
+    const updatedSolution = [...solution.slice(0, -1), updatedLastWord];
+
+    return {
+      ...state,
+      playerSolution: updatedSolution
+    };
   });
 }
 
@@ -100,16 +128,20 @@ export function backspacePlayerSolution(): void {
   // Only work in play mode
   if (!get(playMode)) return;
 
-  playerSolution.update(solution => {
+  puzzleState.update(state => {
+    const solution = state.playerSolution;
     if (!Array.isArray(solution) || solution.length === 0) {
-      return solution;
+      return state;
     }
 
     // Get the last word
     const lastWord = solution[solution.length - 1];
     if (!lastWord || lastWord.length === 0) {
       // If last word is empty, remove it
-      return solution.slice(0, -1);
+      return {
+        ...state,
+        playerSolution: solution.slice(0, -1)
+      };
     }
 
     // Remove last letter from last word
@@ -117,52 +149,16 @@ export function backspacePlayerSolution(): void {
 
     // If the word is now empty, remove it entirely
     if (newLastWord.length === 0) {
-      return solution.slice(0, -1);
+      return {
+        ...state,
+        playerSolution: solution.slice(0, -1)
+      };
     }
 
     // Otherwise, update with the shortened word
-    return [...solution.slice(0, -1), newLastWord];
+    return {
+      ...state,
+      playerSolution: [...solution.slice(0, -1), newLastWord]
+    };
   });
 }
-
-// Save puzzle to localStorage
-function savePuzzleToStorage(): void {
-  try {
-    const puzzle: SavedPuzzle = {
-      fields: get(puzzleFields),
-      playerSolution: get(playerSolution)
-    };
-
-    localStorage.setItem('letterBoxedPuzzle', JSON.stringify(puzzle));
-  } catch (error) {
-    console.warn('Failed to save puzzle:', error);
-  }
-}
-
-// Track previous puzzle fields to detect changes
-let previousFields: string[] = [];
-
-// Subscribe to puzzle field changes
-puzzleFields.subscribe(fields => {
-  if (autoSaveEnabled) {
-    // Check if the puzzle actually changed (not just a reference update)
-    const puzzleChanged = previousFields.length > 0 &&
-      (previousFields.length !== fields.length ||
-        previousFields.some((val, idx) => val !== fields[idx]));
-
-    if (puzzleChanged) {
-      // Reset player solution when puzzle changes
-      playerSolution.set([]);
-    }
-
-    previousFields = [...fields];
-    savePuzzleToStorage();
-  }
-});
-
-// Subscribe to player solution changes
-playerSolution.subscribe(() => {
-  if (autoSaveEnabled) {
-    savePuzzleToStorage();
-  }
-});
