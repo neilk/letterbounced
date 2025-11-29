@@ -60,6 +60,33 @@ export const isPuzzleComplete = derived(
   ($fields) => $fields.every(field => field.length === 1 && /^[A-Z]$/.test(field))
 );
 
+// Derived store - which fields are appendable in play mode
+export const appendableFields = derived(
+  [playerSolution, playMode],
+  ([$solution, $playMode]) => {
+    // Begin with all appendable
+    const isAppendable = Array(12).fill(true);
+
+    // If there was a last letter in the solution, disable its side
+    if ($playMode) {
+      if (Array.isArray($solution) && $solution.length > 0) {
+        const lastWord = $solution[$solution.length - 1];
+        if (lastWord && lastWord.length > 0) {
+          const lastLetterIndex = lastWord[lastWord.length - 1];
+          if (lastLetterIndex !== undefined) {
+            const lastSideStartIndex = Math.floor(lastLetterIndex / 3) * 3;
+            if (!isNaN(lastSideStartIndex)) {
+              isAppendable.splice(lastSideStartIndex, 3, false, false, false);
+            }
+          }
+        }
+      }
+    }
+
+    return isAppendable;
+  }
+);
+
 // Subscribe to state changes and save to localStorage
 puzzleState.subscribe(state => {
   try {
@@ -95,6 +122,29 @@ export function setSolveMode(): void {
   playMode.set(false);
 }
 
+export function isLetterAppendable(letterIndex: number): boolean {
+  if (!get(playMode)) return false;
+
+  const state = get(puzzleState);
+  const solution = state.playerSolution;
+  if (!Array.isArray(solution) || solution.length === 0) {
+    return true; // Can always append to start a new word
+  }
+
+  const lastWord = solution[solution.length - 1];
+  if (!lastWord || lastWord.length === 0) {
+    return true; // Can append to an empty last word
+  }
+  
+  const lastLetterIndex = lastWord[lastWord.length - 1];
+  if (lastLetterIndex === undefined) {
+    return true; // Can append if no previous letter exists
+  }
+
+  // This assumes a 12-letter puzzle arranged in 4 rows of 3 letters each
+  return Math.floor(lastLetterIndex/3) != Math.floor(letterIndex/3);
+}
+
 // Append a letter index to the current word (last word in player solution)
 // Only works in play mode
 export function appendLetterToPlayerSolution(letterIndex: number): void {
@@ -102,7 +152,9 @@ export function appendLetterToPlayerSolution(letterIndex: number): void {
   if (!get(playMode)) return;
 
   // Validate index is in range 0-11
-  if (letterIndex < 0 || letterIndex > 11) return;
+  if (letterIndex < 0 || letterIndex > 11) {
+    throw new Error('Letter index out of range: ' + letterIndex);
+  };
 
   puzzleState.update(state => {
     let solution = state.playerSolution;

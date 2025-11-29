@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { puzzleFields, appendLetterToPlayerSolution, updatePuzzleField } from "../stores/puzzle";
+  import { puzzleFields, appendableFields, appendLetterToPlayerSolution, updatePuzzleField } from "../stores/puzzle";
 
   // Props
   let { playMode = false } = $props<{ playMode?: boolean }>();
@@ -89,8 +89,18 @@
     // Do nothing
   }
 
-  // Make handlers reactive to playMode changes
-  let onClick = $derived(playMode ? appendToSolution : selectFieldText);
+  // Wrapper for appendToSolution that checks appendability
+  function handleClick(index: number, event: MouseEvent | FocusEvent): void {
+    if (playMode) {
+      if ($appendableFields[index]) {
+        appendToSolution(index);
+      }
+      // Otherwise do nothing (noop).
+    } else {
+      selectFieldText(index, event);
+    }
+  }
+
   let onFocus = $derived(playMode ? noop : selectFieldText);
 </script>
 
@@ -102,11 +112,12 @@
       class="letter-field"
       class:jump={jumping[index]}
       class:play-mode={playMode}
+      class:not-appendable={playMode && !$appendableFields[index]}
       value={$puzzleFields[index]}
       readonly={playMode}
       oninput={(e) => handleInput(index, e)}
       onkeydown={(e) => handleKeydown(index, e)}
-      onclick={(e) => onClick(index, e)}
+      onclick={(e) => handleClick(index, e)}
       onfocus={(e) => onFocus(index, e)}
       onanimationend={() => handleAnimationEnd(index)}
     />
@@ -148,6 +159,11 @@
   .letter-field.play-mode {
     cursor: default;
     background: var(--color-bg-container, #f8f9fa);
+  }
+
+  .letter-field.not-appendable {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 
   /* Top side - char00, char01, char02 (left to right) */
