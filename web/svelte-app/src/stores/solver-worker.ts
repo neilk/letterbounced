@@ -97,3 +97,28 @@ export function cancelSolve(): void {
     solving.set(false);
   }
 }
+
+export function checkWord(word: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!worker) {
+      console.error('Worker not initialized');
+      resolve(false);
+      return;
+    }
+
+    // Create a one-time message handler
+    const handleMessage = (e: MessageEvent) => {
+      const { type, word: receivedWord, isValid } = e.data;
+      if (type === 'WORD_VALID' && receivedWord === word) {
+        worker!.removeEventListener('message', handleMessage);
+        resolve(isValid ?? false);
+      }
+    };
+
+    worker.addEventListener('message', handleMessage);
+    worker.postMessage({
+      type: 'CHECK_WORD',
+      payload: { word }
+    });
+  });
+}

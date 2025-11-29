@@ -181,3 +181,18 @@ pub fn cancel_current_solve() {
         console_log!("Warning: Solver not initialized");
     }
 }
+
+#[wasm_bindgen]
+pub fn is_valid_word(word: String) -> bool {
+    let dictionary = match GLOBAL_DICTIONARY.get() {
+        Some(dict) => dict,
+        None => {
+            console_log!("Error: Dictionary not initialized");
+            return false;
+        }
+    };
+
+    // Convert word to lowercase for dictionary lookup
+    let word_lower = word.to_lowercase();
+    dictionary.words.iter().any(|w| w.word == word_lower)
+}

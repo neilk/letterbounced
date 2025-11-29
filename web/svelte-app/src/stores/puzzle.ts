@@ -196,3 +196,34 @@ export function backspacePlayerSolution(): void {
     };
   });
 }
+
+// Advance to the next word in the player solution
+// Starts a new empty word that must begin with the last letter of the previous word
+// Only works in play mode
+export function advanceToNextWord(): void {
+  // Only work in play mode
+  if (!get(playMode)) return;
+
+  puzzleState.update(state => {
+    const solution = state.playerSolution;
+    if (!Array.isArray(solution) || solution.length === 0) {
+      return state;
+    }
+
+    // Get the last word
+    const lastWord = solution[solution.length - 1];
+    if (!lastWord || lastWord.length === 0) {
+      // Can't advance if current word is empty
+      return state;
+    }
+
+    // Get the last letter index from the current word
+    const lastLetterIndex = lastWord[lastWord.length - 1];
+
+    // Start a new word with that letter
+    return {
+      ...state,
+      playerSolution: [...solution, [lastLetterIndex] as Word]
+    };
+  });
+}

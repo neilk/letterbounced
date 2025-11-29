@@ -1,22 +1,25 @@
-import init, { initialize_dictionary, solve_game, cancel_current_solve } from '../pkg/letter_bounced.js';
+import init, { initialize_dictionary, solve_game, cancel_current_solve, is_valid_word } from '../pkg/letter_bounced.js';
 
 interface WorkerMessageData {
-  type: 'INIT' | 'CANCEL' | 'SOLVE';
+  type: 'INIT' | 'CANCEL' | 'SOLVE' | 'CHECK_WORD';
   payload?: {
     dictionaryData?: Uint8Array;
     sides?: string[];
     maxSolutions?: number;
+    word?: string;
   };
   solveId?: number;
 }
 
 interface OutgoingMessage {
-  type: 'READY' | 'COMPLETE' | 'CANCELLED' | 'ERROR';
+  type: 'READY' | 'COMPLETE' | 'CANCELLED' | 'ERROR' | 'WORD_VALID';
   solveId?: number;
   solutions?: string[];
   totalCount?: number;
   duration?: number;
   error?: string;
+  word?: string;
+  isValid?: boolean;
 }
 
 let wasmReadyResolve: () => void = () => { };
@@ -109,5 +112,19 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
       }
       currentSolveId = null;
     }
+  }
+
+  if (type === 'CHECK_WORD') {
+    // Wait for WASM to be ready
+    await wasmReady;
+
+    const word = payload?.word ?? '';
+    const isValid = is_valid_word(word);
+
+    self.postMessage({
+      type: 'WORD_VALID',
+      word,
+      isValid
+    } as OutgoingMessage);
   }
 });
