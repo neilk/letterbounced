@@ -22,24 +22,27 @@ macro_rules! console_log {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
 }
 
-/// Cached data for a board, including optional solved solutions
+/// Cached data for a board, including optional solved solutions and playable dictionary
 #[derive(Clone)]
 struct CachedBoardData {
     board: Board,
+    playable_dictionary: Dictionary,
     solutions: Option<Vec<Solution>>,
 }
 
 impl CachedBoardData {
-    fn new(board: Board) -> Self {
+    fn new(board: Board, playable_dictionary: Dictionary) -> Self {
         CachedBoardData {
             board,
+            playable_dictionary,
             solutions: None,
         }
     }
 
-    fn with_solutions(board: Board, solutions: Vec<Solution>) -> Self {
+    fn with_solutions(board: Board, playable_dictionary: Dictionary, solutions: Vec<Solution>) -> Self {
         CachedBoardData {
             board,
+            playable_dictionary,
             solutions: Some(solutions),
         }
     }
@@ -66,7 +69,7 @@ struct SolveTask {
 static CURRENT_SOLVE: OnceLock<Mutex<Option<SolveTask>>> = OnceLock::new();
 
 /// Get cached board data from cache or create a new one
-fn get_or_create_board_data(game_sides: Vec<String>) -> Result<CachedBoardData, String> {
+fn get_or_create_board_data(game_sides: Vec<String>, dictionary: &Dictionary) -> Result<CachedBoardData, String> {
     // Get or initialize the board cache (lazy initialization)
     let cache_mutex = BOARD_CACHE.get_or_init(|| {
         console_log!("Initializing board cache with capacity 10");
@@ -85,7 +88,13 @@ fn get_or_create_board_data(game_sides: Vec<String>) -> Result<CachedBoardData, 
         // Create new board
         let board = Board::from_sides(game_sides.clone())
             .map_err(|e| e.to_string())?;
-        let data = CachedBoardData::new(board);
+
+        // Compute playable dictionary for this board
+        console_log!("Computing playable dictionary for board");
+        let playable_dictionary = board.playable_dictionary(dictionary);
+        console_log!("Board has {} playable words", playable_dictionary.words.len());
+
+        let data = CachedBoardData::new(board, playable_dictionary);
         // Insert into cache
         cache.put(game_sides, data.clone());
         Ok(data)
@@ -159,7 +168,7 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
         };
 
         // Get or create the board data from cache
-        let cached_data = match get_or_create_board_data(game_sides.clone()) {
+        let cached_data = match get_or_create_board_data(game_sides.clone(), &dictionary) {
             Ok(data) => data,
             Err(e) => {
                 console_log!("Error creating board: {}", e);
@@ -192,7 +201,11 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
             if !cancel_flag.load(Ordering::Relaxed) {
                 if let Some(cache_mutex) = BOARD_CACHE.get() {
                     let mut cache = cache_mutex.lock().unwrap();
-                    let updated_data = CachedBoardData::with_solutions(cached_data.board.clone(), solutions.clone());
+                    let updated_data = CachedBoardData::with_solutions(
+                        cached_data.board.clone(),
+                        cached_data.playable_dictionary.clone(),
+                        solutions.clone()
+                    );
                     cache.put(game_sides.clone(), updated_data);
                     console_log!("Cached {} solutions", solutions.len());
                 }
