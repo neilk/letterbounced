@@ -1,25 +1,23 @@
-import init, { initialize_dictionary, solve_game, cancel_current_solve, is_valid_word } from '../pkg/letter_bounced.js';
+import init, { initialize_dictionary, preload_board, solve_game, cancel_current_solve, get_playable_words } from '../pkg/letter_bounced.js';
 
 interface WorkerMessageData {
-  type: 'INIT' | 'CANCEL' | 'SOLVE' | 'CHECK_WORD';
+  type: 'INIT' | 'CANCEL' | 'SOLVE' | 'GET_PLAYABLE_WORDS';
   payload?: {
     dictionaryData?: Uint8Array;
     sides?: string[];
     maxSolutions?: number;
-    word?: string;
   };
   solveId?: number;
 }
 
 interface OutgoingMessage {
-  type: 'READY' | 'COMPLETE' | 'CANCELLED' | 'ERROR' | 'WORD_VALID';
+  type: 'READY' | 'COMPLETE' | 'CANCELLED' | 'ERROR' | 'PLAYABLE_WORDS';
   solveId?: number;
   solutions?: string[];
   totalCount?: number;
   duration?: number;
   error?: string;
-  word?: string;
-  isValid?: boolean;
+  playableWords?: Set<string>;
 }
 
 let wasmReadyResolve: () => void = () => { };
@@ -68,8 +66,12 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
     try {
       const startTime = performance.now();
 
+      // Preload the board (this caches the board and playable dictionary)
+      console.log(`[Worker] Preloading board for solveId=${solveId}`);
+      await preload_board(sides);
+
       console.log(`[Worker] Calling solve_game for solveId=${solveId}`);
-      // Call the Promise-based solve_game
+      // Call the Promise-based solve_game (requires board to be preloaded)
       const solutions = await solve_game(sides, maxSolutions);
       const duration = Math.round(performance.now() - startTime);
 
@@ -114,17 +116,33 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
     }
   }
 
-  if (type === 'CHECK_WORD') {
+  if (type === 'GET_PLAYABLE_WORDS') {
     // Wait for WASM to be ready
     await wasmReady;
 
-    const word = payload?.word ?? '';
-    const isValid = is_valid_word(word);
+    console.log(`[Worker] Received GET_PLAYABLE_WORDS request, sides=${payload?.sides?.join(',')}`);
 
-    self.postMessage({
-      type: 'WORD_VALID',
-      word,
-      isValid
-    } as OutgoingMessage);
+    const sides = payload?.sides ?? [];
+
+    try {
+      // Get the playable words Set from WASM (board must be preloaded)
+      const playableWords = get_playable_words(sides);
+
+      console.log(`[Worker] Returning ${playableWords.size} playable words`);
+
+      self.postMessage({
+        type: 'PLAYABLE_WORDS',
+        playableWords
+      } as OutgoingMessage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      console.log(`[Worker] get_playable_words failed, error=${errorMessage}`);
+
+      self.postMessage({
+        type: 'ERROR',
+        error: errorMessage
+      } as OutgoingMessage);
+    }
   }
 });

@@ -40,7 +40,7 @@ impl Word {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dictionary {
     pub words: Vec<Word>,
     pub digraphs: HashSet<String>,

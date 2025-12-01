@@ -6,7 +6,7 @@ use crate::solver::{Solver, Solution};
 use std::sync::{OnceLock, Mutex};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use js_sys::Promise;
+use js_sys::{Promise, Set};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 
@@ -68,6 +68,27 @@ struct SolveTask {
 
 static CURRENT_SOLVE: OnceLock<Mutex<Option<SolveTask>>> = OnceLock::new();
 
+/// Get cached board data from cache only (does not create)
+fn get_cached_board_data(game_sides: &Vec<String>) -> Result<CachedBoardData, String> {
+    // Get or initialize the board cache (lazy initialization)
+    let cache_mutex = BOARD_CACHE.get_or_init(|| {
+        console_log!("Initializing board cache with capacity 10");
+        let cache_capacity = NonZeroUsize::new(10).unwrap();
+        Mutex::new(LruCache::new(cache_capacity))
+    });
+
+    let mut cache = cache_mutex.lock().unwrap();
+
+    // Check if board is in cache
+    if let Some(cached_data) = cache.get(game_sides) {
+        console_log!("Board cache hit");
+        Ok(cached_data.clone())
+    } else {
+        console_log!("Board cache miss - board not preloaded");
+        Err("Board not preloaded. Call preload_board first.".to_string())
+    }
+}
+
 /// Get cached board data from cache or create a new one
 fn get_or_create_board_data(game_sides: Vec<String>, dictionary: &Dictionary) -> Result<CachedBoardData, String> {
     // Get or initialize the board cache (lazy initialization)
@@ -121,19 +142,61 @@ pub fn initialize_dictionary(dictionary_data: Vec<u8>) -> Result<(), String> {
 }
 
 #[wasm_bindgen]
+pub fn preload_board(game_sides: Vec<String>) -> Result<(), String> {
+    console_log!("Preload board requested with {} sides", game_sides.len());
+
+    // Check if dictionary is initialized
+    let dictionary = match GLOBAL_DICTIONARY.get() {
+        Some(dict) => dict,
+        None => {
+            console_log!("Error: Dictionary not initialized");
+            return Err("Dictionary not initialized".to_string());
+        }
+    };
+
+    // Create or get the board data from cache
+    match get_or_create_board_data(game_sides, &dictionary) {
+        Ok(_) => {
+            console_log!("Board preloaded successfully");
+            Ok(())
+        }
+        Err(e) => {
+            console_log!("Error preloading board: {}", e);
+            Err(e)
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn get_playable_words(game_sides: Vec<String>) -> Result<Set, String> {
+    console_log!("Get playable words requested with {} sides", game_sides.len());
+
+    // Get the board data from cache (must be preloaded)
+    let cached_data = match get_cached_board_data(&game_sides) {
+        Ok(data) => data,
+        Err(e) => {
+            console_log!("Error: {}", e);
+            return Err(e);
+        }
+    };
+
+    // Create a JavaScript Set
+    let js_set = Set::new(&JsValue::UNDEFINED);
+
+    // Add all words from the playable dictionary to the Set
+    for word in &cached_data.playable_dictionary.words {
+        js_set.add(&JsValue::from_str(&word.word));
+    }
+
+    console_log!("Returning {} playable words", cached_data.playable_dictionary.words.len());
+    Ok(js_set)
+}
+
+#[wasm_bindgen]
 pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
     console_log!("Solve requested with {} sides", game_sides.len());
 
     future_to_promise(async move {
-        // Check if dictionary is initialized
-        let dictionary = match GLOBAL_DICTIONARY.get() {
-            Some(dict) => dict,
-            None => {
-                console_log!("Error: Dictionary not initialized");
-                return Err(JsValue::from_str("Dictionary not initialized"));
-            }
-        };
-
         let new_params = SolveParams {
             sides: game_sides.clone(),
             max_solutions,
@@ -167,11 +230,11 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
             return Err(JsValue::from_str("Solver not initialized"));
         };
 
-        // Get or create the board data from cache
-        let cached_data = match get_or_create_board_data(game_sides.clone(), &dictionary) {
+        // Get the board data from cache (must be preloaded)
+        let cached_data = match get_cached_board_data(&game_sides) {
             Ok(data) => data,
             Err(e) => {
-                console_log!("Error creating board: {}", e);
+                console_log!("Error: {}", e);
 
                 // Clear current task since we failed
                 if let Some(solve_mutex) = CURRENT_SOLVE.get() {
@@ -187,14 +250,12 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
             console_log!("Solutions cache hit - returning {} cached solutions", cached_solutions.len());
             cached_solutions
         } else {
-            console_log!("Solutions cache miss - solving");
-
-            // Clone the Arc (cheap) for the async task
-            let dictionary_arc = dictionary.clone();
+            console_log!("Solutions cache miss - solving with {} playable words",
+                cached_data.playable_dictionary.words.len());
 
             console_log!("Starting solve task");
 
-            let solver = Solver::new(cached_data.board.clone(), &dictionary_arc, max_solutions);
+            let solver = Solver::new(cached_data.board.clone(), &cached_data.playable_dictionary, max_solutions);
             let solutions = solver.solve_cancellable(Some(cancel_flag.clone()));
 
             // Cache the solutions
