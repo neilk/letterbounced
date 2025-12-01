@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 use crate::board::Board;
 use crate::dictionary::Dictionary;
-use crate::solver::Solver;
+use crate::solver::{Solver, Solution};
 use std::sync::{OnceLock, Mutex};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,11 +22,34 @@ macro_rules! console_log {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
 }
 
+/// Cached data for a board, including optional solved solutions
+#[derive(Clone)]
+struct CachedBoardData {
+    board: Board,
+    solutions: Option<Vec<Solution>>,
+}
+
+impl CachedBoardData {
+    fn new(board: Board) -> Self {
+        CachedBoardData {
+            board,
+            solutions: None,
+        }
+    }
+
+    fn with_solutions(board: Board, solutions: Vec<Solution>) -> Self {
+        CachedBoardData {
+            board,
+            solutions: Some(solutions),
+        }
+    }
+}
+
 // Global dictionary storage (wrapped in Arc for sharing across tasks)
 static GLOBAL_DICTIONARY: OnceLock<Arc<Dictionary>> = OnceLock::new();
 
-// Board cache (LRU cache with capacity of 10 boards)
-static BOARD_CACHE: OnceLock<Mutex<LruCache<Vec<String>, Board>>> = OnceLock::new();
+// Board cache (LRU cache with capacity of 10 boards with solutions)
+static BOARD_CACHE: OnceLock<Mutex<LruCache<Vec<String>, CachedBoardData>>> = OnceLock::new();
 
 // Current solve task state
 #[derive(Clone, PartialEq)]
@@ -42,8 +65,8 @@ struct SolveTask {
 
 static CURRENT_SOLVE: OnceLock<Mutex<Option<SolveTask>>> = OnceLock::new();
 
-/// Get a board from cache or create a new one
-fn get_or_create_board(game_sides: Vec<String>) -> Result<Board, String> {
+/// Get cached board data from cache or create a new one
+fn get_or_create_board_data(game_sides: Vec<String>) -> Result<CachedBoardData, String> {
     // Get or initialize the board cache (lazy initialization)
     let cache_mutex = BOARD_CACHE.get_or_init(|| {
         console_log!("Initializing board cache with capacity 10");
@@ -54,17 +77,18 @@ fn get_or_create_board(game_sides: Vec<String>) -> Result<Board, String> {
     let mut cache = cache_mutex.lock().unwrap();
 
     // Check if board is in cache
-    if let Some(cached_board) = cache.get(&game_sides) {
+    if let Some(cached_data) = cache.get(&game_sides) {
         console_log!("Board cache hit");
-        Ok(cached_board.clone())
+        Ok(cached_data.clone())
     } else {
         console_log!("Board cache miss, creating new board");
         // Create new board
         let board = Board::from_sides(game_sides.clone())
             .map_err(|e| e.to_string())?;
+        let data = CachedBoardData::new(board);
         // Insert into cache
-        cache.put(game_sides, board.clone());
-        Ok(board)
+        cache.put(game_sides, data.clone());
+        Ok(data)
     }
 }
 
@@ -134,9 +158,9 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
             return Err(JsValue::from_str("Solver not initialized"));
         };
 
-        // Get or create the board from cache
-        let board = match get_or_create_board(game_sides.clone()) {
-            Ok(board) => board,
+        // Get or create the board data from cache
+        let cached_data = match get_or_create_board_data(game_sides.clone()) {
+            Ok(data) => data,
             Err(e) => {
                 console_log!("Error creating board: {}", e);
 
@@ -149,13 +173,33 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
             }
         };
 
-        // Clone the Arc (cheap) for the async task
-        let dictionary_arc = dictionary.clone();
+        // Check if solutions are already cached
+        let solutions = if let Some(cached_solutions) = cached_data.solutions {
+            console_log!("Solutions cache hit - returning {} cached solutions", cached_solutions.len());
+            cached_solutions
+        } else {
+            console_log!("Solutions cache miss - solving");
 
-        console_log!("Starting solve task");
+            // Clone the Arc (cheap) for the async task
+            let dictionary_arc = dictionary.clone();
 
-        let solver = Solver::new(board, &dictionary_arc, max_solutions);
-        let solutions = solver.solve_cancellable(Some(cancel_flag.clone()));
+            console_log!("Starting solve task");
+
+            let solver = Solver::new(cached_data.board.clone(), &dictionary_arc, max_solutions);
+            let solutions = solver.solve_cancellable(Some(cancel_flag.clone()));
+
+            // Cache the solutions
+            if !cancel_flag.load(Ordering::Relaxed) {
+                if let Some(cache_mutex) = BOARD_CACHE.get() {
+                    let mut cache = cache_mutex.lock().unwrap();
+                    let updated_data = CachedBoardData::with_solutions(cached_data.board.clone(), solutions.clone());
+                    cache.put(game_sides.clone(), updated_data);
+                    console_log!("Cached {} solutions", solutions.len());
+                }
+            }
+
+            solutions
+        };
 
         // Check if we were cancelled
         if cancel_flag.load(Ordering::Relaxed) {
@@ -211,19 +255,4 @@ pub fn cancel_current_solve() {
     } else {
         console_log!("Warning: Solver not initialized");
     }
-}
-
-#[wasm_bindgen]
-pub fn is_valid_word(word: String) -> bool {
-    let dictionary = match GLOBAL_DICTIONARY.get() {
-        Some(dict) => dict,
-        None => {
-            console_log!("Error: Dictionary not initialized");
-            return false;
-        }
-    };
-
-    // Convert word to lowercase for dictionary lookup
-    let word_lower = word.to_lowercase();
-    dictionary.words.iter().any(|w| w.word == word_lower)
 }
