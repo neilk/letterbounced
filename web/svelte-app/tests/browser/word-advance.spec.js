@@ -121,15 +121,13 @@ test('we can backspace to get a word', async ({ page }) => {
 
   await enterLetters(page, [0, 3, 8, 4, 9, 6]); // NEARLY
   // Wait for validation
-  await page.waitForTimeout(500);
-
-  const backspaceButton = page.locator('.backspace-button');
+  await page.waitForTimeout(2000);
 
   await expect((playerSolutionContainer.locator('.word')).nth(0)).toHaveText('NEARLY');
   await expect(page.locator('.next-word-button')).toBeVisible();
 
   // Click backspace
-  await backspaceButton.click();
+  await page.locator('.backspace-button').click();
   await page.waitForTimeout(2000);
 
   // Not a word, so no checkmark
@@ -137,7 +135,7 @@ test('we can backspace to get a word', async ({ page }) => {
   await expect(page.locator('.next-word-button')).not.toBeVisible();
 
   // Click backspace
-  await backspaceButton.click();
+  await page.locator('.backspace-button').click();
   await page.waitForTimeout(2000);
 
   // Word should be advanceable
