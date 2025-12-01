@@ -7,6 +7,8 @@ use std::sync::{OnceLock, Mutex};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use js_sys::Promise;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 
 // Import the `console.log` function from the browser's Web API
 #[wasm_bindgen]
@@ -23,6 +25,9 @@ macro_rules! console_log {
 // Global dictionary storage (wrapped in Arc for sharing across tasks)
 static GLOBAL_DICTIONARY: OnceLock<Arc<Dictionary>> = OnceLock::new();
 
+// Board cache (LRU cache with capacity of 10 boards)
+static BOARD_CACHE: OnceLock<Mutex<LruCache<Vec<String>, Board>>> = OnceLock::new();
+
 // Current solve task state
 #[derive(Clone, PartialEq)]
 struct SolveParams {
@@ -36,6 +41,32 @@ struct SolveTask {
 }
 
 static CURRENT_SOLVE: OnceLock<Mutex<Option<SolveTask>>> = OnceLock::new();
+
+/// Get a board from cache or create a new one
+fn get_or_create_board(game_sides: Vec<String>) -> Result<Board, String> {
+    // Get or initialize the board cache (lazy initialization)
+    let cache_mutex = BOARD_CACHE.get_or_init(|| {
+        console_log!("Initializing board cache with capacity 10");
+        let cache_capacity = NonZeroUsize::new(10).unwrap();
+        Mutex::new(LruCache::new(cache_capacity))
+    });
+
+    let mut cache = cache_mutex.lock().unwrap();
+
+    // Check if board is in cache
+    if let Some(cached_board) = cache.get(&game_sides) {
+        console_log!("Board cache hit");
+        Ok(cached_board.clone())
+    } else {
+        console_log!("Board cache miss, creating new board");
+        // Create new board
+        let board = Board::from_sides(game_sides.clone())
+            .map_err(|e| e.to_string())?;
+        // Insert into cache
+        cache.put(game_sides, board.clone());
+        Ok(board)
+    }
+}
 
 #[wasm_bindgen]
 pub fn initialize_dictionary(dictionary_data: Vec<u8>) -> Result<(), String> {
@@ -103,8 +134,8 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
             return Err(JsValue::from_str("Solver not initialized"));
         };
 
-        // Create the board
-        let board = match Board::from_sides(game_sides) {
+        // Get or create the board from cache
+        let board = match get_or_create_board(game_sides.clone()) {
             Ok(board) => board,
             Err(e) => {
                 console_log!("Error creating board: {}", e);
@@ -114,7 +145,7 @@ pub fn solve_game(game_sides: Vec<String>, max_solutions: u16) -> Promise {
                     *solve_mutex.lock().unwrap() = None;
                 }
 
-                return Err(JsValue::from_str(&e.to_string()));
+                return Err(JsValue::from_str(&e));
             }
         };
 
