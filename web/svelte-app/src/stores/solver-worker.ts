@@ -1,4 +1,4 @@
-import { writable, type Writable } from 'svelte/store';
+import { writable, get, type Writable } from 'svelte/store';
 
 interface SolveStats {
   totalCount: number;
@@ -12,6 +12,7 @@ interface WorkerMessage {
   totalCount?: number;
   duration?: number;
   error?: string;
+  playableWords?: Set<string>;
 }
 
 export const solverReady: Writable<boolean> = writable(false);
@@ -19,6 +20,11 @@ export const solving: Writable<boolean> = writable(false);
 export const solutions: Writable<string[]> = writable([]);
 export const solveStats: Writable<SolveStats> = writable({ totalCount: 0, duration: null });
 export const solverError: Writable<string | null> = writable(null);
+
+// Board preloading state
+export const boardPreloaded: Writable<boolean> = writable(false);
+export const boardPreloading: Writable<boolean> = writable(false);
+export const playableWords: Writable<Set<string> | null> = writable(null);
 
 let currentSolveId = 0;
 let worker: Worker | null = null;
@@ -30,12 +36,25 @@ export function initializeSolverWorker(dictionaryData: Uint8Array): void {
   );
 
   worker.addEventListener('message', (e: MessageEvent<WorkerMessage>) => {
-    const { type, solveId, solutions: receivedSolutions, totalCount, duration, error } = e.data;
+    const { type, solveId, solutions: receivedSolutions, totalCount, duration, error, playableWords: receivedWords } = e.data;
 
     console.log(`[Store] Received ${type} message, solveId=${solveId}, currentSolveId=${currentSolveId}`);
 
     if (type === 'READY') {
       solverReady.set(true);
+    }
+
+    if (type === 'PLAYABLE_WORDS') {
+      console.log(`[Store] Received playable words, count=${receivedWords?.size}`);
+      if (receivedWords) {
+        playableWords.set(receivedWords);
+        boardPreloaded.set(true);
+        boardPreloading.set(false);
+      } else {
+        console.error('No playable words in PLAYABLE_WORDS message');
+        boardPreloaded.set(false);
+        boardPreloading.set(false);
+      }
     }
 
     if (type === 'COMPLETE') {
@@ -62,6 +81,8 @@ export function initializeSolverWorker(dictionaryData: Uint8Array): void {
       console.error('Solver error:', error);
       solverError.set(error ?? 'Unknown error');
       solving.set(false);
+      // Also clear preloading state on error
+      boardPreloading.set(false);
     }
   });
 
@@ -71,9 +92,33 @@ export function initializeSolverWorker(dictionaryData: Uint8Array): void {
   });
 }
 
+export function preloadBoard(sides: string[]): void {
+  if (!worker) {
+    console.error('Worker not initialized');
+    return;
+  }
+
+  console.log(`[Store] preloadBoard called, sides=${sides.join(',')}`);
+  boardPreloading.set(true);
+  boardPreloaded.set(false);
+  playableWords.set(null);
+
+  worker.postMessage({
+    type: 'GET_PLAYABLE_WORDS',
+    payload: { sides }
+  });
+}
+
 export function solvePuzzle(sides: string[], maxSolutions = 10000): void {
   if (!worker) {
     console.error('Worker not initialized');
+    return;
+  }
+
+  // Safety check - board must be preloaded
+  if (!get(boardPreloaded)) {
+    console.error('Board not preloaded - cannot solve');
+    solverError.set('Board not preloaded. Please wait for board to initialize.');
     return;
   }
 
@@ -96,29 +141,4 @@ export function cancelSolve(): void {
     worker.postMessage({ type: 'CANCEL' });
     solving.set(false);
   }
-}
-
-export function checkWord(word: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (!worker) {
-      console.error('Worker not initialized');
-      resolve(false);
-      return;
-    }
-
-    // Create a one-time message handler
-    const handleMessage = (e: MessageEvent) => {
-      const { type, word: receivedWord, isValid } = e.data;
-      if (type === 'WORD_VALID' && receivedWord === word) {
-        worker!.removeEventListener('message', handleMessage);
-        resolve(isValid ?? false);
-      }
-    };
-
-    worker.addEventListener('message', handleMessage);
-    worker.postMessage({
-      type: 'CHECK_WORD',
-      payload: { word }
-    });
-  });
 }

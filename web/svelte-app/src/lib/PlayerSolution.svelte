@@ -1,6 +1,6 @@
 <script lang="ts">
   import { playerSolution, puzzleFields, backspacePlayerSolution, advanceToNextWord } from '../stores/puzzle';
-  import { checkWord } from '../stores/solver-worker';
+  import { playableWords } from '../stores/solver-worker';
 
   let { playMode = false } = $props<{ playMode?: boolean }>();
 
@@ -21,13 +21,11 @@
 
   // Check if the last word is valid in the dictionary
   $effect(() => {
-    if ($playerSolution.length > 0) {
+    if ($playerSolution.length > 0 && $playableWords) {
       const lastWord = $playerSolution[$playerSolution.length - 1];
       if (lastWord && lastWord.length >= MINIMUM_WORD_LENGTH) {
-        const wordStr = wordToString(lastWord);
-        checkWord(wordStr).then(valid => {
-          isLastWordValid = valid;
-        });
+        const wordStr = wordToString(lastWord).toLowerCase();
+        isLastWordValid = $playableWords.has(wordStr);
       } else {
         isLastWordValid = false;
       }

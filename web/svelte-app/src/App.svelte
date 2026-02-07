@@ -11,9 +11,12 @@
   } from './stores/puzzle';
   import {
     initializeSolverWorker,
+    preloadBoard as workerPreloadBoard,
     solvePuzzle as workerSolvePuzzle,
     solutions,
-    solverReady
+    solverReady,
+    boardPreloaded,
+    boardPreloading
   } from './stores/solver-worker';
   import { throttle } from './utils/throttle';
 
@@ -33,16 +36,42 @@
     }
   });
 
-  // Throttled solve function - only throttle the actual solving
+  // Throttled preload function
+  const throttledPreload = throttle((sides: string[]) => {
+    workerPreloadBoard(sides);
+  }, 300);
+
+  // Throttled solve function
   const throttledSolve = throttle((sides: string[]) => {
     workerSolvePuzzle(sides);
   }, 300);
 
-  // Reactive statement: auto-solve when puzzle changes or solver becomes ready
+  // Reactive statement 1: Auto-preload board when puzzle is complete
   $: {
     if ($puzzleFields.every(f => f.length === 1 && /^[A-Z]$/.test(f))) {
       // Puzzle is complete
-      if ($solverReady) {
+      if ($solverReady && !$boardPreloading) {
+        const sides = [
+          $puzzleFields.slice(0, 3).join(''),   // top
+          $puzzleFields.slice(3, 6).join(''),   // right
+          $puzzleFields.slice(9, 12).join(''),  // bottom
+          $puzzleFields.slice(6, 9).join('')    // left
+        ].map(s => s.toLowerCase());
+
+        throttledPreload(sides);
+      }
+    } else {
+      // Puzzle is incomplete - clear preload state immediately
+      boardPreloaded.set(false);
+      solutions.set([]);
+    }
+  }
+
+  // Reactive statement 2: Auto-solve when board is preloaded
+  $: {
+    if ($puzzleFields.every(f => f.length === 1 && /^[A-Z]$/.test(f))) {
+      // Puzzle is complete
+      if ($solverReady && $boardPreloaded) {
         const sides = [
           $puzzleFields.slice(0, 3).join(''),   // top
           $puzzleFields.slice(3, 6).join(''),   // right
@@ -52,9 +81,6 @@
 
         throttledSolve(sides);
       }
-    } else {
-      // Puzzle is incomplete - clear solutions immediately (no throttle)
-      solutions.set([]);
     }
   }
 </script>

@@ -66,11 +66,7 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
     try {
       const startTime = performance.now();
 
-      // Preload the board (this caches the board and playable dictionary)
-      console.log(`[Worker] Preloading board for solveId=${solveId}`);
-      await preload_board(sides);
-
-      console.log(`[Worker] Calling solve_game for solveId=${solveId}`);
+      console.log(`[Worker] Calling solve_game for solveId=${solveId} (board must be preloaded)`);
       // Call the Promise-based solve_game (requires board to be preloaded)
       const solutions = await solve_game(sides, maxSolutions);
       const duration = Math.round(performance.now() - startTime);
@@ -125,7 +121,11 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
     const sides = payload?.sides ?? [];
 
     try {
-      // Get the playable words Set from WASM (board must be preloaded)
+      // Preload the board (this caches the board and playable dictionary)
+      console.log(`[Worker] Preloading board`);
+      await preload_board(sides);
+
+      // Get the playable words Set from WASM (board is now preloaded)
       const playableWords = get_playable_words(sides);
 
       console.log(`[Worker] Returning ${playableWords.size} playable words`);
@@ -137,7 +137,7 @@ self.addEventListener('message', async (e: MessageEvent<WorkerMessageData>) => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      console.log(`[Worker] get_playable_words failed, error=${errorMessage}`);
+      console.log(`[Worker] Preload/get_playable_words failed, error=${errorMessage}`);
 
       self.postMessage({
         type: 'ERROR',
