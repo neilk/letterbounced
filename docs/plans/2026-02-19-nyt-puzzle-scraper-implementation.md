@@ -2,152 +2,159 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Replace the broken NYT CORS fetch in PuzzleLoader with a daily-scraped static JSON file served from the same origin via GitHub Pages.
+**Goal:** Replace direct NYT fetches in the frontend with a CI-scraped static JSON cache served from the same origin, using a Node.js scraper script and branch-based GitHub Pages deployment.
 
-**Architecture:** A GitHub Actions cron job scrapes the NYT page hourly, extracts `printDate` and `sides` from `window.gameData`, and commits `puzzles/YYYY-MM-DD.json` to the `gh-pages` branch. The deploy workflow is changed from artifact-based to branch-based, preserving the `puzzles/` directory across deploys. The frontend fetches by local date with a yesterday fallback.
+**Architecture:** A Node.js `.mjs` script fetches the NYT puzzle hourly in GitHub Actions and writes `puzzles/YYYY-MM-DD.json` to the `gh-pages` branch. The deploy workflow switches from artifact-based to `peaceiris/actions-gh-pages` (branch-based), using `keep_files: true` to preserve accumulated puzzle files. The frontend fetches by local date with a yesterday fallback.
 
-**Tech Stack:** Python 3 (stdlib only) for scraper, GitHub Actions for CI/CD, Svelte/TypeScript for frontend, Playwright for frontend tests.
+**Tech Stack:** Node.js 20 (built-in `fetch`, `node:test`, `node:fs`), GitHub Actions, `peaceiris/actions-gh-pages@v3`, Svelte/TypeScript, Playwright
 
 ---
 
-### Task 1: Create Python scraper script with unit tests
+### Task 1: Write the Node.js scraper and its tests (TDD)
 
 **Files:**
-- Create: `scripts/scrape_puzzle.py`
-- Create: `tests/test_scrape_puzzle.py`
+- Create: `tests/test_scrape_puzzle.mjs`
+- Create: `scripts/scrape_puzzle.mjs`
+- Delete: `scripts/scrape_puzzle.py`, `tests/test_scrape_puzzle.py`
 
 **Step 1: Write the failing tests**
 
-Create `tests/test_scrape_puzzle.py`:
+Create `tests/test_scrape_puzzle.mjs`:
 
-```python
-import json
-import sys
-from pathlib import Path
+```javascript
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { parsePuzzle } from '../scripts/scrape_puzzle.mjs';
 
-import pytest
+test('parsePuzzle extracts date and sides', () => {
+  const html = 'window.gameData = {"printDate":"2026-02-19","sides":["RLU","CNA","EHI","SZQ"],"dictionary":[]}';
+  const { printDate, sides } = parsePuzzle(html);
+  assert.equal(printDate, '2026-02-19');
+  assert.deepEqual(sides, ['RLU', 'CNA', 'EHI', 'SZQ']);
+});
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from scripts.scrape_puzzle import parse_puzzle
+test('parsePuzzle throws on missing data', () => {
+  assert.throws(
+    () => parsePuzzle('<html>no gameData here</html>'),
+    /Could not find puzzle data/
+  );
+});
 
-
-def test_parse_puzzle_extracts_date_and_sides():
-    html = 'window.gameData = {"printDate":"2026-02-19","sides":["RLU","CNA","EHI","SZQ"],"dictionary":[]}'
-    date, sides = parse_puzzle(html)
-    assert date == "2026-02-19"
-    assert sides == ["RLU", "CNA", "EHI", "SZQ"]
-
-
-def test_parse_puzzle_exits_on_missing_data():
-    with pytest.raises(SystemExit):
-        parse_puzzle("<html>no gameData here</html>")
-
-
-def test_parse_puzzle_handles_whitespace_in_json():
-    html = 'window.gameData = { "printDate" : "2026-03-01" , "sides" : [ "ABC" , "DEF" , "GHI" , "JKL" ] }'
-    date, sides = parse_puzzle(html)
-    assert date == "2026-03-01"
-    assert sides == ["ABC", "DEF", "GHI", "JKL"]
+test('parsePuzzle handles whitespace in JSON', () => {
+  const html = 'window.gameData = { "printDate" : "2026-03-01" , "sides" : [ "ABC" , "DEF" , "GHI" , "JKL" ] }';
+  const { printDate, sides } = parsePuzzle(html);
+  assert.equal(printDate, '2026-03-01');
+  assert.deepEqual(sides, ['ABC', 'DEF', 'GHI', 'JKL']);
+});
 ```
 
-**Step 2: Run tests to confirm they fail**
+**Step 2: Run the test to confirm it fails**
 
 ```bash
-cd /path/to/letterbounced
-python3 -m pytest tests/test_scrape_puzzle.py -v
+node --test tests/test_scrape_puzzle.mjs
 ```
 
-Expected: `ModuleNotFoundError: No module named 'scripts'` (file doesn't exist yet)
+Expected: error — `Cannot find module '../scripts/scrape_puzzle.mjs'`
 
-**Step 3: Create the scraper script**
+**Step 3: Implement the scraper**
 
-Create `scripts/scrape_puzzle.py`:
+Create `scripts/scrape_puzzle.mjs`:
 
-```python
-import json
-import re
-import sys
-from pathlib import Path
-from urllib.request import Request, urlopen
+```javascript
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-NYT_URL = "https://www.nytimes.com/puzzles/letter-boxed"
-USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
-)
+const NYT_URL = 'https://www.nytimes.com/puzzles/letter-boxed';
+const USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
+  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+  'Chrome/120.0.0.0 Safari/537.36';
 
+export function parsePuzzle(html) {
+  const dateMatch = html.match(/"printDate"\s*:\s*"(\d{4}-\d{2}-\d{2})"/);
+  const sidesMatch = html.match(/"sides"\s*:\s*(\[[^\]]+\])/);
+  if (!dateMatch || !sidesMatch) {
+    throw new Error('Could not find puzzle data in page');
+  }
+  return {
+    printDate: dateMatch[1],
+    sides: JSON.parse(sidesMatch[1]),
+  };
+}
 
-def parse_puzzle(html: str) -> tuple[str, list[str]]:
-    """Extract printDate and sides from NYT Letter Boxed HTML."""
-    date_match = re.search(r'"printDate"\s*:\s*"(\d{4}-\d{2}-\d{2})"', html)
-    sides_match = re.search(r'"sides"\s*:\s*(\[[^\]]+\])', html)
+async function main() {
+  const outputDir = process.argv[2] || 'puzzles';
+  mkdirSync(outputDir, { recursive: true });
 
-    if not date_match or not sides_match:
-        print("ERROR: Could not find puzzle data in page", file=sys.stderr)
-        sys.exit(1)
+  const response = await fetch(NYT_URL, { headers: { 'User-Agent': USER_AGENT } });
+  if (!response.ok) {
+    console.error(`HTTP error: ${response.status}`);
+    process.exit(1);
+  }
 
-    print_date = date_match.group(1)
-    sides = json.loads(sides_match.group(1))
-    return print_date, sides
+  let printDate, sides;
+  try {
+    ({ printDate, sides } = parsePuzzle(await response.text()));
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
 
+  const outputFile = join(outputDir, `${printDate}.json`);
+  if (existsSync(outputFile)) {
+    console.log(`Puzzle for ${printDate} already exists, skipping.`);
+    return;
+  }
 
-def main() -> None:
-    output_dir = Path("puzzles")
-    output_dir.mkdir(exist_ok=True)
+  writeFileSync(outputFile, JSON.stringify({ sides }));
+  console.log(`Wrote puzzle for ${printDate}: ${sides}`);
+}
 
-    req = Request(NYT_URL, headers={"User-Agent": USER_AGENT})
-    with urlopen(req) as response:
-        html = response.read().decode("utf-8")
-
-    print_date, sides = parse_puzzle(html)
-    output_file = output_dir / f"{print_date}.json"
-
-    if output_file.exists():
-        print(f"Puzzle for {print_date} already exists, skipping.")
-        return
-
-    output_file.write_text(json.dumps({"sides": sides}))
-    print(f"Wrote puzzle for {print_date}: {sides}")
-
-
-if __name__ == "__main__":
-    main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(e => { console.error(e); process.exit(1); });
+}
 ```
 
-**Step 4: Run tests to confirm they pass**
+The `if (process.argv[1] === ...)` guard means `main()` only runs when the file is executed directly — not when imported by tests.
+
+**Step 4: Run the tests to confirm they pass**
 
 ```bash
-python3 -m pytest tests/test_scrape_puzzle.py -v
+node --test tests/test_scrape_puzzle.mjs
 ```
 
-Expected: all 3 tests PASS
+Expected output includes:
+```
+ℹ tests 3
+ℹ pass 3
+ℹ fail 0
+```
 
-**Step 5: Run the script manually to verify it works end-to-end**
+**Step 5: Delete the Python files**
 
 ```bash
-mkdir -p /tmp/puzzle-test && cd /tmp/puzzle-test
-python3 /path/to/letterbounced/scripts/scrape_puzzle.py
-cat puzzles/*.json
+git rm scripts/scrape_puzzle.py tests/test_scrape_puzzle.py
+rm -rf scripts/__pycache__ tests/__pycache__
 ```
-
-Expected: a JSON file like `{"sides": ["RLU", "CNA", "EHI", "SZQ"]}` with today's date.
 
 **Step 6: Commit**
 
 ```bash
-git add scripts/scrape_puzzle.py tests/test_scrape_puzzle.py
-git commit -m "feat: add NYT puzzle scraper script"
+git add scripts/scrape_puzzle.mjs tests/test_scrape_puzzle.mjs
+git commit -m "Replace Python scraper with Node.js .mjs (no dependencies)"
 ```
 
 ---
 
-### Task 2: Create the scraper GitHub Actions workflow
+### Task 2: Create the scrape-puzzle GitHub Actions workflow
 
 **Files:**
 - Create: `.github/workflows/scrape-puzzle.yml`
 
 **Step 1: Create the workflow file**
+
+Create `.github/workflows/scrape-puzzle.yml`:
 
 ```yaml
 name: Scrape NYT Puzzle
@@ -155,7 +162,7 @@ name: Scrape NYT Puzzle
 on:
   schedule:
     - cron: '0 * * * *'  # every hour
-  workflow_dispatch:       # allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -169,15 +176,16 @@ jobs:
         with:
           ref: gh-pages
 
-      - name: Get scraper script from main
-        run: |
-          git fetch origin main
-          git checkout origin/main -- scripts/scrape_puzzle.py
+      - name: Checkout main (for scraper script)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-src
 
       - name: Run scraper
-        run: python3 scripts/scrape_puzzle.py
+        run: node main-src/scripts/scrape_puzzle.mjs puzzles/
 
-      - name: Commit and push if new puzzle found
+      - name: Commit and push if new puzzle
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -189,23 +197,21 @@ jobs:
 
 ```bash
 git add .github/workflows/scrape-puzzle.yml
-git commit -m "feat: add hourly puzzle scraper workflow"
+git commit -m "Add hourly scrape-puzzle workflow"
 ```
 
 ---
 
-### Task 3: Update the deploy workflow for branch-based GitHub Pages
+### Task 3: Update deploy.yml to branch-based deployment
+
+The current workflow uses `actions/configure-pages`, `actions/upload-pages-artifact`, and a separate `deploy` job. Replace the last two steps and the entire `deploy` job with `peaceiris/actions-gh-pages@v3`. Also add a scraper unit-test step and change permissions.
 
 **Files:**
 - Modify: `.github/workflows/deploy.yml`
 
-The current workflow uses `actions/configure-pages`, `actions/upload-pages-artifact`, and a separate `deploy` job with `actions/deploy-pages`. Replace the last two build steps and the entire `deploy` job with a shell script that commits to the `gh-pages` branch directly. Also change `permissions` from `pages: write / id-token: write` to `contents: write`.
+**Step 1: Update permissions**
 
-**Step 1: Replace the deploy mechanism**
-
-In `.github/workflows/deploy.yml`, make the following changes:
-
-1. Change the top-level `permissions` block from:
+Change the top-level `permissions` block from:
 ```yaml
 permissions:
   contents: read
@@ -218,7 +224,17 @@ permissions:
   contents: write
 ```
 
-2. In the `build` job, replace these three steps:
+**Step 2: Add scraper unit-test step**
+
+Insert this step immediately after the `Checkout` step (before `Setup Rust`):
+```yaml
+      - name: Test scraper script
+        run: node --test tests/test_scrape_puzzle.mjs
+```
+
+**Step 3: Replace artifact deploy steps with peaceiris action**
+
+Remove these two steps from the `build` job:
 ```yaml
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -228,110 +244,125 @@ permissions:
         with:
           path: './web/svelte-app/dist'
 ```
-with:
+
+And add in their place:
 ```yaml
-      - name: Deploy to gh-pages branch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Save built site
-          cp -r web/svelte-app/dist /tmp/site
-
-          # Fetch gh-pages branch
-          git fetch origin gh-pages || true
-
-          # Switch to gh-pages (create orphan on first run)
-          if git rev-parse --verify origin/gh-pages > /dev/null 2>&1; then
-            git checkout gh-pages
-            if [ -d puzzles ]; then
-              cp -r puzzles /tmp/puzzles
-            fi
-          else
-            git checkout --orphan gh-pages
-            git rm -rf . --quiet
-          fi
-
-          # Clear current content
-          find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
-
-          # Copy new site
-          cp -r /tmp/site/. .
-
-          # Restore puzzles
-          if [ -d /tmp/puzzles ]; then
-            cp -r /tmp/puzzles puzzles
-          fi
-
-          # Prevent Jekyll processing
-          touch .nojekyll
-
-          git add -A
-          git diff --staged --quiet || git commit -m "Deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push origin gh-pages
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web/svelte-app/dist
+          keep_files: true
 ```
 
-3. Delete the entire `deploy` job (the second job in the file, starting with `deploy:`).
+`keep_files: true` preserves files already on `gh-pages` that are not in `dist/` (i.e. the `puzzles/` directory written by the scraper workflow).
 
-**Step 2: Commit**
+**Step 4: Delete the entire `deploy` job**
+
+Remove the second top-level job from the file (everything from `deploy:` to the end):
+```yaml
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+**Step 5: Commit**
 
 ```bash
 git add .github/workflows/deploy.yml
-git commit -m "feat: switch to branch-based GitHub Pages deployment"
+git commit -m "Switch to branch-based Pages deploy, run scraper tests in CI"
 ```
 
 ---
 
-### Task 4: Manual — initialize gh-pages branch and update Pages settings
-
-This task must be done before merging to main. Run these commands locally:
-
-**Step 1: Initialize the gh-pages branch**
-
-```bash
-# From the repo root, on main branch
-git checkout --orphan gh-pages
-git rm -rf . --quiet
-touch .nojekyll
-git add .nojekyll
-git commit -m "Initialize gh-pages branch"
-git push origin gh-pages
-git checkout main
-```
-
-**Step 2: Update GitHub Pages settings**
-
-In the GitHub repo settings (https://github.com/YOUR_USERNAME/letterbounced/settings/pages):
-- Source: **Deploy from a branch**
-- Branch: **gh-pages** / **/ (root)**
-- Click **Save**
-
-After saving, the next push to `main` will trigger the deploy workflow, which will populate `gh-pages` with the built site.
-
----
-
-### Task 5: Update PuzzleLoader.svelte
+### Task 4: Update PuzzleLoader.svelte (TDD)
 
 **Files:**
+- Create: `web/svelte-app/tests/puzzle-loader.spec.js`
 - Modify: `web/svelte-app/src/lib/PuzzleLoader.svelte`
 
-**Step 1: Replace `loadTodaysPuzzle()`**
+**Step 1: Write the failing Playwright tests**
 
-Replace the entire `loadTodaysPuzzle` function (lines 22–58) with:
+Create `web/svelte-app/tests/puzzle-loader.spec.js`:
+
+```javascript
+import { test, expect } from '@playwright/test';
+
+test("loads today's NYT puzzle from static JSON", async ({ page }) => {
+  await page.route('**/puzzles/**', route => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ sides: ['ABC', 'DEF', 'GHI', 'JKL'] }),
+    });
+  });
+
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  await page.selectOption('.pill-select', { label: "Today's New York Times" });
+
+  const inputs = page.locator('.letter-box-container input[type="text"]');
+  await expect(inputs.nth(0)).toHaveValue('A', { timeout: 5000 });
+  await expect(inputs.nth(3)).toHaveValue('D', { timeout: 5000 });
+});
+
+test('falls back to yesterday on 404', async ({ page }) => {
+  let requestCount = 0;
+  await page.route('**/puzzles/**', route => {
+    requestCount++;
+    if (requestCount === 1) {
+      route.fulfill({ status: 404 });
+    } else {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ sides: ['XYZ', 'QRS', 'TUV', 'WXY'] }),
+      });
+    }
+  });
+
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  await page.selectOption('.pill-select', { label: "Today's New York Times" });
+
+  const inputs = page.locator('.letter-box-container input[type="text"]');
+  await expect(inputs.nth(0)).toHaveValue('X', { timeout: 5000 });
+});
+```
+
+Note: this file imports directly from `@playwright/test`, not the custom fixture, because it needs to set up routes before navigation.
+
+**Step 2: Run the tests to confirm they fail**
+
+```bash
+cd web/svelte-app && npx playwright test tests/puzzle-loader.spec.js
+```
+
+Expected: tests fail — `PuzzleLoader` still fetches from NYT directly, not `./puzzles/...`
+
+**Step 3: Update PuzzleLoader.svelte**
+
+In `web/svelte-app/src/lib/PuzzleLoader.svelte`, replace the entire `loadTodaysPuzzle` function (lines 22–58):
 
 ```typescript
   async function loadTodaysPuzzle(): Promise<void> {
     loading = true;
     try {
-      const localDate: string = new Date().toLocaleDateString('en-CA');
-      let response: Response = await fetch(`${import.meta.env.BASE_URL}puzzles/${localDate}.json`);
+      const today: string = new Date().toLocaleDateString('en-CA');
+      let response: Response = await fetch(`./puzzles/${today}.json`);
 
       if (response.status === 404) {
-        // Fall back to yesterday for users ahead of the scraper's timezone
-        const yesterday: Date = new Date();
+        const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayDate: string = yesterday.toLocaleDateString('en-CA');
-        response = await fetch(`${import.meta.env.BASE_URL}puzzles/${yesterdayDate}.json`);
+        const yesterdayStr: string = yesterday.toLocaleDateString('en-CA');
+        response = await fetch(`./puzzles/${yesterdayStr}.json`);
       }
 
       if (!response.ok) {
@@ -351,107 +382,43 @@ Replace the entire `loadTodaysPuzzle` function (lines 22–58) with:
   }
 ```
 
-**Step 2: Add a sample puzzle file for local dev**
+**Step 4: Run the Playwright tests to confirm they pass**
 
 ```bash
-mkdir -p web/svelte-app/public/puzzles
-echo '{"sides":["RLU","CNA","EHI","SZQ"]}' > web/svelte-app/public/puzzles/$(date +%Y-%m-%d).json
+cd web/svelte-app && npx playwright test tests/puzzle-loader.spec.js
 ```
 
-Add this file to `.gitignore` so sample puzzles aren't committed:
+Expected: both tests pass.
+
+**Step 5: Run the full Playwright suite**
 
 ```bash
-echo 'web/svelte-app/public/puzzles/' >> .gitignore
+cd web/svelte-app && npx playwright test
 ```
 
-**Step 3: Commit**
+Expected: all tests pass.
+
+**Step 6: Commit**
 
 ```bash
-git add web/svelte-app/src/lib/PuzzleLoader.svelte .gitignore
-git commit -m "feat: load today's puzzle from static JSON file"
+git add web/svelte-app/src/lib/PuzzleLoader.svelte \
+        web/svelte-app/tests/puzzle-loader.spec.js
+git commit -m "Fetch puzzle from static JSON instead of NYT directly"
 ```
 
 ---
 
-### Task 6: Add Playwright test for puzzle loading
+## Verification After Merge
 
-**Files:**
-- Modify: `web/svelte-app/tests/basic.spec.js`
+1. **Scraper unit tests**: `node --test tests/test_scrape_puzzle.mjs` — 3 pass.
+2. **Playwright tests**: `cd web/svelte-app && npx playwright test` — all pass.
+3. **Manual scraper run**: `node scripts/scrape_puzzle.mjs /tmp/test-puzzles/` — creates `/tmp/test-puzzles/YYYY-MM-DD.json`.
+4. **CI**: Push to `main`, watch Actions tab — deploy workflow should run scraper tests then push to `gh-pages`.
+5. **Scraper workflow**: Trigger `workflow_dispatch` on "Scrape NYT Puzzle" — confirm a puzzle JSON appears on `gh-pages`.
+6. **Live site**: Visit the deployed URL, select "Today's New York Times" — puzzle loads with no CORS errors.
 
-**Step 1: Add the test**
+## Notes
 
-Add this test to `web/svelte-app/tests/basic.spec.js` (before the closing of the file):
-
-```javascript
-test('load today\'s NYT puzzle from static file', async ({ page }) => {
-  const today = new Date().toLocaleDateString('en-CA');
-
-  // Mock the puzzle endpoint
-  await page.route(`**/puzzles/${today}.json`, route => {
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ sides: ['NUO', 'ERT', 'YIA', 'LCP'] })
-    });
-  });
-
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
-
-  // Select "Today's New York Times" from the dropdown
-  await page.selectOption('.pill-select', '__NYT_TODAY__');
-
-  // Verify letters were loaded (first input should be N)
-  const inputs = page.locator('.letter-box-container input[type="text"]');
-  await expect(inputs.nth(0)).toHaveValue('N', { timeout: 5000 });
-});
-```
-
-**Step 2: Run the tests locally to verify**
-
-```bash
-cd web/svelte-app
-npx playwright test tests/basic.spec.js --headed
-```
-
-Expected: all tests pass including the new one.
-
-**Step 3: Commit**
-
-```bash
-git add web/svelte-app/tests/basic.spec.js
-git commit -m "test: add Playwright test for puzzle loading"
-```
-
----
-
-### Task 7: Merge to main and verify
-
-**Step 1: Ensure all tests pass**
-
-```bash
-cargo test
-cd web/svelte-app && npm run build && npx playwright test
-```
-
-**Step 2: Merge the branch**
-
-```bash
-git checkout main
-git merge nyt-proxy-fetch
-git push origin main
-```
-
-**Step 3: Verify the deploy workflow runs and succeeds**
-
-Watch the Actions tab on GitHub. The deploy workflow should:
-1. Build WASM + Svelte
-2. Push built site to `gh-pages`, preserving `puzzles/`
-
-**Step 4: Trigger the scraper manually**
-
-In the GitHub Actions tab, manually trigger "Scrape NYT Puzzle" (workflow_dispatch). Verify it creates `puzzles/YYYY-MM-DD.json` in the `gh-pages` branch.
-
-**Step 5: Verify the live site**
-
-Visit the deployed GitHub Pages URL and select "Today's New York Times" from the dropdown. The puzzle should load.
+- The `gh-pages` branch must exist before the scraper workflow runs. The first successful deploy creates it via `peaceiris/actions-gh-pages`.
+- In local dev (`npm run dev`), "Today's New York Times" returns 404 (no `puzzles/` dir). To test locally, place `web/svelte-app/public/puzzles/YYYY-MM-DD.json` — Vite serves `public/` at root during dev.
+- `keep_files: true` in `peaceiris/actions-gh-pages` ensures puzzle files (written by the scraper) are never deleted by a deploy run.
