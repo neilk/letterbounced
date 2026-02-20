@@ -32,7 +32,7 @@ test('falls back to yesterday on 404', async ({ page }) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ sides: ['XYZ', 'QRS', 'TUV', 'WXY'] }),
+        body: JSON.stringify({ sides: ['XYZ', 'QRS', 'TUV', 'ABC'] }),
       });
     }
   });

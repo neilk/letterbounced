@@ -19,6 +19,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './web/svelte-app/package-lock.json'
+
       - name: Test scraper script
         run: node --test tests/test_scrape_puzzle.mjs
 
@@ -32,13 +39,6 @@ jobs:
 
       - name: Build WASM
         run: ./build-web.sh
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './web/svelte-app/package-lock.json'
 
       - name: Install dependencies
         run: |
