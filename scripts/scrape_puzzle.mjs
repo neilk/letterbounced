@@ -9,15 +9,25 @@ const USER_AGENT =
   'Chrome/120.0.0.0 Safari/537.36';
 
 export function parsePuzzle(html) {
-  const dateMatch = html.match(/"printDate"\s*:\s*"(\d{4}-\d{2}-\d{2})"/);
-  const sidesMatch = html.match(/"sides"\s*:\s*(\[[^\]]+\])/);
+  const gameDataIdx = html.indexOf('window.gameData');
+  if (gameDataIdx === -1) {
+    throw new Error('Could not find puzzle data in page');
+  }
+  const snippet = html.slice(gameDataIdx, gameDataIdx + 5000);
+
+  const dateMatch = snippet.match(/"printDate"\s*:\s*"(\d{4}-\d{2}-\d{2})"/);
+  const sidesMatch = snippet.match(/"sides"\s*:\s*(\[[^\]]+\])/);
   if (!dateMatch || !sidesMatch) {
     throw new Error('Could not find puzzle data in page');
   }
-  return {
-    printDate: dateMatch[1],
-    sides: JSON.parse(sidesMatch[1]),
-  };
+
+  let sides;
+  try {
+    sides = JSON.parse(sidesMatch[1]);
+  } catch {
+    throw new Error('Could not parse sides array from puzzle data');
+  }
+  return { printDate: dateMatch[1], sides };
 }
 
 async function main() {
@@ -45,7 +55,7 @@ async function main() {
   }
 
   writeFileSync(outputFile, JSON.stringify({ sides }));
-  console.log(`Wrote puzzle for ${printDate}: ${sides}`);
+  console.log(`Wrote puzzle for ${printDate}: ${JSON.stringify(sides)}`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
