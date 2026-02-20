@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test("loads today's NYT puzzle from static JSON", async ({ page }) => {
-  await page.route('**/puzzles/**', route => {
+  await page.route(url => url.pathname.startsWith('/puzzles/'), route => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -20,7 +20,7 @@ test("loads today's NYT puzzle from static JSON", async ({ page }) => {
 
 test('falls back to yesterday on 404', async ({ page }) => {
   let requestCount = 0;
-  await page.route('**/puzzles/**', route => {
+  await page.route(url => url.pathname.startsWith('/puzzles/'), route => {
     requestCount++;
     if (requestCount === 1) {
       route.fulfill({ status: 404 });
