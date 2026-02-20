@@ -22,27 +22,39 @@ A GitHub Actions cron job scrapes the NYT puzzle daily and stores it as a static
 
 The existing deploy workflow (`.github/workflows/deploy.yml`) builds WASM + Svelte and deploys to GitHub Pages. The final step changes from artifact-based deployment to branch-based:
 
-- After building `dist/`, copy the existing `puzzles/` directory from the `gh-pages` branch into `dist/puzzles/` (preserving accumulated puzzle files)
-- Commit and push `dist/` contents to the `gh-pages` branch
+- After building `dist/`, fetch the `puzzles/` directory from the `gh-pages` branch and copy it into `dist/puzzles/` (preserving accumulated puzzle files)
+- Commit and push `dist/` contents to the `gh-pages` branch directly
 - GitHub Pages is configured in repo settings to serve from the `gh-pages` branch root
+- Requires upgrading `contents` permission from `read` to `write`
 
 ### 2. Scraper Workflow (new)
 
 New file: `.github/workflows/scrape-puzzle.yml`
 
-- Runs hourly (`0 * * * *` cron)
-- Checks out `gh-pages` branch
-- Runs `scripts/scrape_puzzle.py` (checked into `main`) which:
-  - Fetches `https://www.nytimes.com/puzzles/letter-boxed` with a browser-like User-Agent
-  - Parses `window.gameData` from the HTML using regex
-  - Extracts `printDate` and `sides`
-  - If `puzzles/{printDate}.json` already exists, exits (idempotent)
-  - Otherwise writes `{"sides": [...]}` and commits + pushes to `gh-pages`
+- Runs hourly (`0 * * * *` cron) and supports `workflow_dispatch` for manual runs
+- Uses two checkout steps:
+  - Checks out `main` into `main-src/` (to access the script)
+  - Checks out `gh-pages` into the workspace root (the output location)
+- Runs `node main-src/scripts/scrape_puzzle.mjs puzzles/`
+- On any new puzzle file, commits and pushes to the `gh-pages` branch
 - Requires `contents: write` permission
+- Node.js 20 is pre-installed on `ubuntu-latest` — no setup action needed
 
-The Python script lives in `main` so it is version-controlled with the app.
+### 3. Scraper Script
 
-### 3. Puzzle Storage Format
+New file: `scripts/scrape_puzzle.mjs`
+
+A standalone Node.js ES module. No `package.json` or `node_modules` — uses only Node 18+ built-ins:
+
+- Accepts output directory as a CLI argument (e.g. `node scripts/scrape_puzzle.mjs puzzles/`)
+- Fetches `https://www.nytimes.com/puzzles/letter-boxed` with a browser-like `User-Agent` using built-in `fetch()`
+- Extracts `window.gameData` from the HTML using a regex
+- Parses `printDate` and `sides` from the JSON
+- If `{outputDir}/{printDate}.json` already exists, exits 0 (idempotent)
+- Otherwise writes `{"sides": [...]}` to that path and exits 0
+- On any error (network failure, parse failure, missing data), writes to stderr and exits non-zero
+
+### 4. Puzzle Storage Format
 
 Files stored at `puzzles/YYYY-MM-DD.json` in the `gh-pages` branch root:
 
@@ -52,7 +64,7 @@ Files stored at `puzzles/YYYY-MM-DD.json` in the `gh-pages` branch root:
 
 `printDate` is omitted — it is redundant with the filename.
 
-### 4. Frontend (PuzzleLoader.svelte)
+### 5. Frontend (PuzzleLoader.svelte)
 
 Replace `loadTodaysPuzzle()`:
 
