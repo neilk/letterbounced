@@ -11,17 +11,10 @@ use std::path::Path;
  *
  * We want to create the word list from two sources, which are both large text files.
  *    - the collins scrabble words, a newline-delimited text file, one word per line, e.g.
- *          AA
- *          AAH
- *          AAHED
- *          AAHING
- *          AAHS
+ *      `AA`, `AAH`, `AAHED`, `AAHING`, `AAHS`
  *    - a dump from google ngrams, a tab-separated newline-delimited text file, with integers representing
- *      how frequent the word is. Larger is more frequent. The largest number here is ~ 2**36
- *          a       14219615690
- *          a!      196012
- *          a"      84
- *          a'      47713
+ *      how frequent the word is. Larger is more frequent. The largest number here is ~ 2**36,
+ *      e.g. `a  14219615690`, `a!  196012`, `a"  84`, `a'  47713`
  *
  * We will iterate through both files simultaneously, outputing lines as appropriate, e.g.
  *          aba 114620
