@@ -22,36 +22,27 @@
   async function loadTodaysPuzzle(): Promise<void> {
     loading = true;
     try {
-      const url: string = 'https://www.nytimes.com/puzzles/letter-boxed';
-      let response: Response;
+      const today: string = new Date().toLocaleDateString('en-CA');
+      let response: Response = await fetch(`./puzzles/${today}.json`);
 
-      // Try direct fetch first (works on deployed HTTPS sites)
-      try {
-        response = await fetch(url);
-      } catch (e) {
-        // Fall back to CORS proxy for localhost
-        const proxyUrl: string = 'https://corsproxy.io/?' + encodeURIComponent(url);
-        response = await fetch(proxyUrl);
+      if (response.status === 404) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr: string = yesterday.toLocaleDateString('en-CA');
+        response = await fetch(`./puzzles/${yesterdayStr}.json`);
       }
 
-      const html: string = await response.text();
-      const regex: RegExp = /window\.gameData.*?"sides"\s*:\s*(\[.*?\])/;
-      const match: RegExpMatchArray | null = html.match(regex);
-
-      if (!match || !match[1]) {
-        alert('Failed to find puzzle data on the NYT page. The page format may have changed.');
+      if (!response.ok) {
+        alert("Today's puzzle is not available yet. Please try again later.");
         return;
       }
 
-      const sidesData: string[] = JSON.parse(match[1]) as string[];
-      // Convert sides array to fields array
-      const fields: string[] = sidesData.flatMap((side: string) => side.split(''));
-
-      // Update puzzle store (effect in LetterBox will handle display and animation)
+      const data = await response.json() as { sides: string[] };
+      const fields: string[] = data.sides.flatMap((side: string) => side.split(''));
       puzzleFields.set(fields);
     } catch (error) {
       const message: string = error instanceof Error ? error.message : 'Unknown error';
-      alert('Failed to load today\'s puzzle: ' + message);
+      alert("Failed to load today's puzzle: " + message);
     } finally {
       loading = false;
     }
