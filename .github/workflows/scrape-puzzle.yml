@@ -1,0 +1,34 @@
+name: Scrape NYT Puzzle
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Checkout main (for scraper script)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-src
+
+      - name: Run scraper
+        run: node main-src/scripts/scrape_puzzle.mjs puzzles/
+
+      - name: Commit and push if new puzzle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add puzzles/
+          git diff --staged --quiet || (git commit -m "Add puzzle $(date -u +%Y-%m-%d)" && git push)
