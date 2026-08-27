@@ -2,7 +2,7 @@ name: Scrape NYT Puzzle
 
 on:
   schedule:
-    - cron: '0 * * * *'  # every hour
+    - cron: '0 */4 * * *'  # every 4 hours
   workflow_dispatch:
 
 permissions:
@@ -13,15 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout gh-pages
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: gh-pages
 
       - name: Checkout main (for scraper script)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           path: main-src
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
 
       - name: Run scraper
         run: node main-src/scripts/scrape_puzzle.mjs puzzles/
