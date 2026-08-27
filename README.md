@@ -164,6 +164,50 @@ Opens at http://localhost:4173/
 
 ![Screenshot of WASM site](solver-web.png)
 
+### Today's New York Times puzzle
+
+The app never contacts nytimes.com from the browser. Instead,
+`.github/workflows/scrape-puzzle.yml` runs every four hours, scrapes the puzzle with
+`scripts/scrape_puzzle.mjs`, and commits it to the `gh-pages` branch as
+`puzzles/YYYY-MM-DD.json`. The "Today's New York Times" menu item just fetches that
+static file. If today's file isn't there yet, it falls back to yesterday's.
+
+Locally there is no `gh-pages` branch to read, so `npm run dev` scrapes today's puzzle
+into `web/svelte-app/public/puzzles/` first, via the `predev` hook. That step is skipped
+when `$CI` is set — CI must not depend on nytimes.com being up — and a failed scrape only
+warns, so the dev server still starts when you're offline. To fetch by hand:
+
+```bash
+cd web/svelte-app && npm run scrape
+```
+
+### Deployment
+
+Pushing to `main` runs `.github/workflows/deploy.yml`, which builds the WASM and the Svelte
+app, runs the Playwright tests, then copies `dist/` over the `gh-pages` branch and pushes.
+GitHub Pages serves that branch directly.
+
+The copy is deliberately additive rather than a clean replace, so the `puzzles/` JSON that
+`scrape-puzzle.yml` commits to the same branch survives a deploy. It also means a newly
+scraped puzzle goes live within about a minute, without rebuilding the app.
+
+> **The Pages source must stay set to "Deploy from a branch" → `gh-pages` / `(root)`.**
+>
+> Switching it to "GitHub Actions" breaks the site *silently*: `deploy.yml` publishes by
+> pushing to the branch, not by uploading a Pages artifact, so Pages would ignore every
+> subsequent deploy and keep serving the last artifact-based build — while the workflow
+> still reports success on every run. If the deployed site doesn't match `main`, check
+> this before suspecting caching or the app code.
+>
+> Verify with:
+>
+> ```bash
+> gh api repos/neilk/letterbounced/pages --jq '{build_type, source}'
+> # want: {"build_type":"legacy","source":{"branch":"gh-pages","path":"/"}}
+> ```
+>
+> If you ever do move to Actions-based Pages, `puzzles/` has to be copied into `dist/`
+> before upload, or the New York Times feature will 404.
 
 ### Basic Command Structure
 
