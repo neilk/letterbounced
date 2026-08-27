@@ -20,7 +20,7 @@ and not uncoincidentally it's my first real Rust project.
 
 ## Notes on the algorithm
 
-See [algorithm notes](ALGORITHM.md).
+See [algorithm notes](docs/algorithm.md).
 
 ## What is Letter Boxed?
 
