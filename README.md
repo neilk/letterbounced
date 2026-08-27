@@ -1,8 +1,8 @@
 # Letter Bounced 
 
-A solver for the New York Times word puzzle, "Letter Boxed". 
+A solver for the New York Times word puzzle, "Letter Boxed". [Try it out!](https://neilk.github.io/letterbounced/)
 
-Try it out at https://neilk.github.io/letterbounced/ !
+![Screenshot of the Letter Bounced web app](solver-web.png)
 
 ## Why?
 
@@ -31,7 +31,7 @@ with a chain of valid words, as in the following screenshot.
 
 ## Game Rules
 
-1. **Four-sided puzzle**: Letters are arranged on four sides of a square. (Though, boxchar may allow other shapes)
+1. **Four-sided puzzle**: Letters are arranged on four sides of a square. (Though, Letter Bounced may allow other shapes)
 2. **No same-side connections**: You cannot connect two letters from the same side. Think of it as bouncing between sides.
 3. **Word chaining**: Each new word must start with the last letter of the previous word
 4. **Complete coverage**: All letters must be used across your word sequence
@@ -47,10 +47,9 @@ Given the puzzle:
 JGH NVY EID ORP
 ```
 
-A possible two-word solution is: `HYPERDRIVE-ENJOINING`
+The only two-word solution is: `DOJO-OVERHYPING`
 
 A possible three-word solution is: `DOVE-ENJOYING-GRYPHON`
-
 
 Note how each letter hops to a different side, and the words are connected by their first/last letters.
 
@@ -59,23 +58,72 @@ Note how each letter hops to a different side, and the words are connected by th
 Make sure you have Rust installed, then:
 
 ```bash
-git clone <repository-url>
-cd boxchar
+git clone git@github.com:neilk/letterbounced.git
+cd letterbounced
 cargo build --release
 ```
 
-## Usage
+This produces the `letter-bounced` binary in `target/release/`.
 
-### Command-line
+## Command-line usage
 
 ```bash
-$ cat data/game.txt 
+letter-bounced [OPTIONS] [BOARD_SPEC]
+```
+
+### Specifying the board
+
+You can specify the board in two ways:
+
+#### 1. Positional argument (comma-separated)
+
+```bash
+cargo run --release --bin letter-bounced -- "YFA,OTK,LGW,RNI"
+```
+
+Requirements:
+
+- Only letters (A-Z, a-z) and commas allowed
+- No spaces permitted
+- Must have exactly 4 sides with equal lengths
+
+#### 2. File path (`--board`)
+
+```bash
+cargo run --release --bin letter-bounced -- --board data/board.txt
+```
+
+The board file should contain 4 lines, each representing one side:
+
+```
+YFA
+OTK
+LGW
+RNI
+```
+
+Board files must have all sides the same length, and no duplicate letters across all sides.
+
+### Options
+
+| Option | Description | Default | Required |
+|--------|-------------|---------|----------|
+| `BOARD_SPEC` | Board as comma-separated sides (e.g., "ABC,DEF,GHI,JKL") | - | Either this or `--board` |
+| `--board <PATH>` | Path to board file | - | Either this or `BOARD_SPEC` |
+| `--dictionary <PATH>` | Path to dictionary file | `data/dictionary.txt` | No |
+| `--max-solutions <N>` | Maximum solutions to print (max 65535) | `500` | No |
+| `--help` | Show help information | - | No |
+
+### Example run
+
+```bash
+$ cat data/board.txt 
 YFA
 OTK
 LGW
 RNI
 
-$ time ./target/release/boxchar --board=data/board.txt --max-solutions=10    
+$ time ./target/release/letter-bounced --board=data/board.txt --max-solutions=10
 forklift-twangy
 know-wolf-fragility
 know-waif-fragility
@@ -87,12 +135,22 @@ work-kalif-fragrantly
 work-kaif-flagrantly
 work-kaif-fragrantly
 
-./target/release/boxchar --board=data/board.txt --max-solutions=10  0.78s user 0.05s system 70% cpu 1.183 total
+./target/release/letter-bounced --board=data/board.txt --max-solutions=10  0.90s user 0.09s system 95% cpu 1.037 total
 ```
+
+### Error cases
+
+The application will exit with an error if
+
+- There is no clear board specification, from file or command line
+- Board specification contains invalid characters (anything other than A-Z, a-z, comma)
+- Board file cannot be read or has invalid format
+- Dictionary file cannot be read
 
 ## Web Application
 
 The web application is built with Svelte and powered by Rust/WASM.
+
 
 ### Building the WASM Package
 
@@ -106,63 +164,49 @@ This creates the WASM files in `web/svelte-app/src/pkg/` and copies the dictiona
 
 ### Development Mode
 
-Run the Svelte development server with hot module replacement.
+Run the Svelte development server with hot module replacement:
 
-**From repository root:**
 ```bash
 cd web/svelte-app
-npm install  # First time only
-npm run dev
-```
-
-**Or from `web/svelte-app/` directory:**
-```bash
 npm install  # First time only
 npm run dev
 ```
 
 Opens at http://localhost:8000/
-- Changes update instantly in the browser
-- Source maps for debugging
-- Optimized for development speed
 
 ### Production Build
 
-Build optimized static files for deployment.
+Build optimized static files for deployment:
 
-**From repository root:**
 ```bash
 cd web/svelte-app
-npm run build
-```
-
-**Or from `web/svelte-app/` directory:**
-```bash
 npm run build
 ```
 
 - Outputs to `web/svelte-app/dist/` directory
-- Total bundle: ~50 KB (gzipped) + 2.2 MB dictionary + 79 KB WASM
+- App bundle: ~21 KB gzipped (46 KB JS + 11 KB CSS + 7 KB solver worker uncompressed)
+- Plus 87 KB WASM (39 KB gzipped) and the 2.2 MB dictionary (700 KB gzipped)
 - Can be deployed to any static hosting (GitHub Pages, Netlify, Vercel, etc.)
 
 ### Preview Production Build
 
-Test the production build locally (must be run after `npm run build`).
+Test the production build locally (must be run after `npm run build`):
 
-**From repository root:**
 ```bash
 cd web/svelte-app
-npm run preview
-```
-
-**Or from `web/svelte-app/` directory:**
-```bash
 npm run preview
 ```
 
 Opens at http://localhost:4173/
 
-![Screenshot of WASM site](solver-web.png)
+### Tests
+
+Playwright tests start the dev server themselves:
+
+```bash
+cd web/svelte-app
+npm test
+```
 
 ### Today's New York Times puzzle
 
@@ -191,130 +235,8 @@ The copy is deliberately additive rather than a clean replace, so the `puzzles/`
 `scrape-puzzle.yml` commits to the same branch survives a deploy. It also means a newly
 scraped puzzle goes live within about a minute, without rebuilding the app.
 
-> **The Pages source must stay set to "Deploy from a branch" → `gh-pages` / `(root)`.**
->
-> Switching it to "GitHub Actions" breaks the site *silently*: `deploy.yml` publishes by
-> pushing to the branch, not by uploading a Pages artifact, so Pages would ignore every
-> subsequent deploy and keep serving the last artifact-based build — while the workflow
-> still reports success on every run. If the deployed site doesn't match `main`, check
-> this before suspecting caching or the app code.
->
-> Verify with:
->
-> ```bash
-> gh api repos/neilk/letterbounced/pages --jq '{build_type, source}'
-> # want: {"build_type":"legacy","source":{"branch":"gh-pages","path":"/"}}
-> ```
->
-> If you ever do move to Actions-based Pages, `puzzles/` has to be copied into `dist/`
-> before upload, or the New York Times feature will 404.
-
-### Basic Command Structure
-
-```bash
-cargo run -- [OPTIONS] [GAME_SPEC]
-```
-
-### Specifying the Game
-
-You can specify the game in two ways:
-
-#### 1. Positional Argument (Comma-separated)
-```bash
-# Specify game directly as comma-separated sides
-cargo run -- "YFA,OTK,LGW,RNI"
-```
-
-Requirements:
-- Only letters (A-Z, a-z) and commas allowed
-- No spaces permitted
-- Letters are automatically converted to uppercase
-- Must have exactly 4 sides with equal lengths
-
-#### 2. File Path (--game option)
-```bash
-# Load game from a file
-cargo run -- --game data/board.txt
-```
-
-The game file should contain 4 lines, each representing one side:
-```
-YFA
-OTK
-LGW
-RNI
-```
-
-### Command Line Options
-
-| Option | Description | Default | Required |
-|--------|-------------|---------|----------|
-| `BOARD_SPEC` | Board as comma-separated sides (e.g., "ABC,DEF,GHI,JKL") | - | Either this or `--board` |
-| `--board <PATH>` | Path to board file | - | Either this or `BOARD_SPEC` |
-| `--wordlist <PATH>` | Path to wordlist file | `data/wordlist.txt` | No |
-| `--help` | Show help information | - | No |
-
-### Examples
-
-```bash
-# Using positional board specification
-cargo run -- yfa,otk,lgw,rni
-
-# Using board file with custom dictionary
-cargo run -- --board data/board.txt --wordlist path/to/custom_dictionary.txt
-
-# Get help
-cargo run -- --help
-```
-
-### Error Cases
-
-The application will exit with an error if
-
-- There is no clear board specification, from file or command line
-- Board specification contains invalid characters (anything other than A-Z, a-z, comma)
-- Board file cannot be read or has invalid format
-- Dictionary file cannot be read
-
-## Development Commands
-
-```bash
-# Build the project
-cargo build
-
-# Run with development profile
-cargo run
-
-# Run tests
-cargo test
-
-# Run specific test
-cargo test <test_name>
-
-# Quick syntax check
-cargo check
-
-# Run linting
-cargo clippy
-
-# Format code
-cargo fmt
-```
-
-## Game File Format
-
-Game files must follow these rules:
-
-- All sides must have the same length
-- No duplicate letters across all sides
-
-Example valid game file:
-```
-ABC
-DEF
-GHI
-JKL
-```
+The Pages source must stay set to "Deploy from a branch" → `gh-pages` / `(root)`. Otherwise,
+rebuilds will not modify the public-facing website.
 
 ## Dictionary Format
 
@@ -325,13 +247,13 @@ Dictionary files are plain text, should contain one word per line, with two whit
 
 The file should be sorted with most frequent words first.
 
-The script ./build-dictionary.sh will construct this for you, given the included Collins Scrabble Words, and a sorted list 
-of the frequency of all words in Google NGrams. This file is not provided in this repository.
+The script `./build-dictionary.sh` will construct this for you, given the included Collins Scrabble Words, and a sorted list 
+of the frequency of all words in Google NGrams. That frequency file is not provided in this repository.
 
 
 ## License
 
-Copyright Neil Kandalgaonkar, 2025. 
+Copyright Neil Kandalgaonkar, 2025-2026. 
 
 This software is *NOT* freely redistributable.
 
