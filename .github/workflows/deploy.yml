@@ -68,9 +68,30 @@ jobs:
           path: web/svelte-app/playwright-report/
           retention-days: 30
 
-      - name: Deploy to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Checkout gh-pages
+        uses: actions/checkout@v7
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./web/svelte-app/dist
-          keep_files: true
+          ref: gh-pages
+          path: gh-pages-out
+
+      # Copies dist over the branch without deleting anything else, so the
+      # puzzles/ JSON that scrape-puzzle.yml commits here survives a deploy.
+      # Pages serves this branch directly (Settings -> Pages must stay on
+      # "Deploy from a branch"), so a scraped puzzle goes live without a rebuild.
+      - name: Deploy to gh-pages
+        working-directory: gh-pages-out
+        run: |
+          cp -R ../web/svelte-app/dist/. .
+          touch .nojekyll  # Pages runs Jekyll on branch deploys otherwise
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet && echo "No change to publish." && exit 0
+          git commit -m "deploy: $GITHUB_SHA"
+          # scrape-puzzle.yml pushes here too, so retry on a non-fast-forward.
+          for attempt in 1 2 3; do
+            git push && exit 0
+            echo "Push rejected (attempt $attempt); rebasing onto gh-pages."
+            git pull --rebase origin gh-pages
+          done
+          exit 1
