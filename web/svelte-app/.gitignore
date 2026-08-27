@@ -29,3 +29,6 @@ playwright-report/*
 test-results
 test-results/*
 
+
+# Locally scraped NYT puzzles (served by vite dev from public/)
+public/puzzles
