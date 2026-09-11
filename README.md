@@ -150,6 +150,8 @@ The application will exit with an error if
 ## Web Application
 
 The web application is built with Svelte and powered by Rust/WASM.
+For how it actually works — the worker protocol, the no-submit-button design, and the
+dark mode generator — see [web notes](docs/web.md).
 
 
 ### Building the WASM Package
