@@ -18,9 +18,9 @@ The New York Times puzzle page is very popular! Yet, the existing solvers that I
 I got obsessed with this game about a year ago and I kept thinking of ways to write a fast solver. Here's my attempt,
 and not uncoincidentally it's my first real Rust project.
 
-## Notes on the algorithm
+## Tech notes
 
-See [algorithm notes](docs/algorithm.md).
+There are more specific docs on the [algorithm](docs/algorithm.md) and the [Rust-WASM website](docs/web.md).
 
 ## What is Letter Boxed?
 
