@@ -207,7 +207,7 @@ impl Solver {
         }
 
         // Sort by score descending
-        solutions.sort_by(|a, b| b.score.cmp(&a.score));
+        solutions.sort_by_key(|a| std::cmp::Reverse(a.score));
 
         // Ensure we don't exceed max_solutions after sorting
         solutions.truncate(self.max_solutions);
